@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/osint/num", "destination": "/api/osint/num" }
+  ]
+}
