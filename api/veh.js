@@ -1,24 +1,19 @@
-// Vehicle Info API
-// Leak by Abhigyan — If you remove credit your mother will be fuck
-// Made by DZ HACKER
+// Vehicle Info API — exact curl replica
+// Credit: DZ
 
 export default async function handler(req, res) {
   const url = new URL(req.url, `https://${req.headers.host}`);
 
-  // ---------- API ON / OFF TOGGLE ----------
-  // 1) Query override:  /veh?api=off   OR  /veh?api=on
-  // 2) Env variable:    API_STATUS=off  (set in Vercel dashboard)
-  // 3) Default:         on
+  // ---------- API ON / OFF ----------
   const apiToggle = (url.searchParams.get('api') || '').toLowerCase();
   const apiStatus = apiToggle || (process.env.API_STATUS || 'on').toLowerCase();
 
   if (apiStatus === 'off') {
     return res.status(503).json({
       success: false,
-      made_by: "DZ HACKER",
+      by: "DZ",
       status: "MAINTENANCE",
-      message: "🛠️ API is under maintenance. Please try again later.",
-      credit: "Leak by Abhigyan"
+      message: "🛠️ API is under maintenance. Try again later."
     });
   }
 
@@ -29,13 +24,11 @@ export default async function handler(req, res) {
     url.searchParams.get('regn_no') ||
     url.searchParams.get('vehicle');
 
-  // Support /veh?UP-70-EC-6873  (value-less query key)
   if (!regNo) {
     const keys = [...url.searchParams.keys()].filter(k => k !== 'api' && k !== 'mobile');
     if (keys.length > 0) regNo = keys[0];
   }
 
-  // Support /veh/UP-70-EC-6873 (path style)
   if (!regNo) {
     const parts = url.pathname.split('/').filter(Boolean);
     if (parts.length > 1 && parts[0] === 'veh') regNo = parts[1];
@@ -44,29 +37,16 @@ export default async function handler(req, res) {
   if (!regNo) {
     return res.status(400).json({
       success: false,
-      made_by: "DZ HACKER",
+      by: "DZ",
       error: "Missing vehicle number.",
-      usage: "/veh?UP-70-EC-6873  or  /veh?reg=UP-70-EC-6873"
+      usage: "/veh?UP-70-EC-6873"
     });
   }
 
-  regNo = decodeURIComponent(regNo).toUpperCase().trim().replace(/\s+/g, '');
-
-  // Basic validation: Indian format e.g. UP70EC6873 / UP-70-EC-6873
-  if (!/^[A-Z]{2}[-\s]?\d{1,2}[-\s]?[A-Z]{0,3}[-\s]?\d{1,4}$/.test(regNo)) {
-    return res.status(400).json({
-      success: false,
-      made_by: "DZ HACKER",
-      error: "Invalid vehicle number format.",
-      received: regNo,
-      example: "UP-70-EC-6873"
-    });
-  }
-
+  regNo = decodeURIComponent(regNo).toUpperCase().trim();
   const mobile = url.searchParams.get('mobile') || '9838230002';
 
-  // ---------- BUILD UPSTREAM REQUEST ----------
-  const upstream = 'https://www.renewbuy.com/api/v1/vaahan/registration_number/';
+  // ---------- EXACT CURL PARAMS ----------
   const params = new URLSearchParams({
     regn_no: regNo,
     partner_code: '',
@@ -75,6 +55,9 @@ export default async function handler(req, res) {
     originData: 'false'
   });
 
+  const upstream = `https://www.renewbuy.com/api/v1/vaahan/registration_number/?${params.toString()}`;
+
+  // ---------- EXACT CURL HEADERS ----------
   const headers = {
     'Host': 'apex.renewbuyinsurance.com',
     'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36',
@@ -94,12 +77,9 @@ export default async function handler(req, res) {
   };
 
   try {
-    const apiRes = await fetch(`${upstream}?${params.toString()}`, {
-      method: 'GET',
-      headers
-    });
-
+    const apiRes = await fetch(upstream, { method: 'GET', headers });
     const text = await apiRes.text();
+
     let data;
     try {
       data = JSON.parse(text);
@@ -107,33 +87,28 @@ export default async function handler(req, res) {
       data = { raw: text };
     }
 
-    // If upstream returned HTML (blocked / error page), flag it
     if (typeof text === 'string' && text.trimStart().startsWith('<')) {
-      return res.status(502).json({
+      return res.status(apiRes.status).json({
         success: false,
-        made_by: "DZ HACKER",
+        by: "DZ",
         reg_no: regNo,
-        error: "Upstream returned a non-JSON response (likely blocked or rate-limited).",
         upstream_status: apiRes.status,
-        result: data,
-        credit: "Leak by DZ"
+        result: data
       });
     }
 
     return res.status(200).json({
       success: true,
-      made_by: "DZ HACKER",
+      by: "DZ",
       reg_no: regNo,
-      result: data,
-      credit: "Leak by DZ"
+      result: data
     });
   } catch (err) {
     return res.status(500).json({
       success: false,
-      made_by: "DZ HACKER",
+      by: "DZ",
       reg_no: regNo,
-      error: err.message,
-      credit: "Leak by DZ"
+      error: err.message
     });
   }
 }
