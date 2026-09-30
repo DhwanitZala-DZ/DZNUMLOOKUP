@@ -1,10 +1,9 @@
-
 {
   "name": "dz-osint",
   "version": "1.0.0",
-  "type": "module",
   "private": true,
+  "description": "MADE BY DZ HACKER",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   }
 }
