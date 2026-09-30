@@ -16,7 +16,6 @@ const UPSTREAM    = 'https://aegisosint.lovable.app';
 const SERVER_FN   = '3537b4c4c6768e84fe0c0558f5fef63d61e1e2ef20ce24538d3ca5962aa49ff8';
 const TYPE        = 'num';
 
-// Your Supabase access token — refresh this when it expires (~1 hour)
 const JWT         = 'eyJhbGciOiJFUzI1NiIsImtpZCI6ImI5OTVlNDJkLThkMTgtNDE0MS04Yjc0LWVhM2ExZmI3ODhlZSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2Ztd2trZHRjY3RpaW1weXJhbHFwLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIzOTc1NzY2Zi0wODIwLTQzMjEtYjNmZS1mNTI5ODdmNTIzMDYiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzkwNzcwMTY1LCJpYXQiOjE3OTA3NjY1NjUsImVtYWlsIjoibWVoYXRhcmFqdUBnbWFpbC5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsIjoibWVoYXRhcmFqdUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJzdWIiOiIzOTc1NzY2Zi0wODIwLTQzMjEtYjNmZS1mNTI5ODdmNTIzMDYiLCJ1c2VybmFtZSI6Im1laGF0YXJhanUifSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc5MDc2NjU2NX1dLCJzZXNzaW9uX2lkIjoiMDZmNTU3MzYtMjAxZC00YzJlLWEzY2UtZDQwOGUzMTI1MDkyIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.KY0uWxP39gMQ6PJfCa5xWo9uA6utQRVGfNSkIrkGM4Yy2Q5DV7nDMAhM9yYi5rMxEO6K1wxiwTLe-1_mtp_20g';
 
 // Set to null to leave the endpoint open. Set to a string to require ?key=THAT
@@ -24,36 +23,33 @@ const DZ_API_KEY  = null;
 
 // ────────────────────────────────────────────────────────────────
 // Seroval framed-response decoder
-// Handles every tag type the upstream emits, including all
-// primitive wrappers, bigints, dates, maps, sets, boxed values.
 // ────────────────────────────────────────────────────────────────
 function decode(node) {
   if (node === null || node === undefined) return null;
   if (typeof node !== 'object') return node;
 
   switch (node.t) {
-    // primitives
     case 0: return Number(node.s);
     case 1: return String(node.s);
     case 2: {
       const m = { 0: null, 1: false, 2: true, 3: false, 4: -0, 5: Infinity, 6: -Infinity, 7: NaN };
       return m[node.s] ?? null;
     }
-    case 3: return node.s !== undefined ? BigInt(node.s) : null;   // bigint
+    case 3: return node.s !== undefined ? BigInt(node.s) : null;
     case 4: return undefined;
-    case 5: return node.s !== undefined ? new Date(Number(node.s)) : null;  // date
-    case 6: return node.s ?? null;                                  // regexp (as string)
-    case 7: return new Set((node.a || []).map(decode));             // set
-    case 8: {                                                       // map
+    case 5: return node.s !== undefined ? new Date(Number(node.s)) : null;
+    case 6: return node.s ?? null;
+    case 7: return new Set((node.a || []).map(decode));
+    case 8: {
       const out = new Map();
       const k = node.p?.k || [];
       const v = node.p?.v || [];
       for (let i = 0; i < k.length; i++) out.set(decode(k[i]), decode(v[i]));
       return out;
     }
-    case 9: return (node.a || []).map(decode);                      // array
+    case 9: return (node.a || []).map(decode);
     case 10:
-    case 11: {                                                      // object
+    case 11: {
       const out = {};
       const k = node.p?.k || [];
       const v = node.p?.v || [];
@@ -63,25 +59,22 @@ function decode(node) {
       }
       return out;
     }
-    case 12: return decode(node.f ?? node.s ?? null);               // boxed primitive
-    case 13: case 14: {                                             // error types
+    case 12: return decode(node.f ?? node.s ?? null);
+    case 13: case 14: {
       const out = { name: 'Error', message: '' };
-      if (node.p) {
-        const obj = decode({ t: 10, p: node.p });
-        Object.assign(out, obj);
-      }
+      if (node.p) Object.assign(out, decode({ t: 10, p: node.p }));
       if (node.s) out.message = node.s;
       if (node.m) out.message = node.m;
       return out;
     }
-    case 15: case 16: return node.f ?? node.s ?? null;              // typed arrays
+    case 15: case 16: return node.f ?? node.s ?? null;
     case 17: return null;
-    case 18: return node.s ?? null;                                 // symbol
-    case 19: return node.s ?? null;                                 // base64 blob
-    case 20: return node.s ?? null;                                 // data view
-    case 21: return node.s ?? null;                                 // object ref
-    case 22: case 23: case 24: return null;                         // promise states — skip
-    case 25: {                                                      // plugin-wrapped value
+    case 18: return node.s ?? null;
+    case 19: return node.s ?? null;
+    case 20: return node.s ?? null;
+    case 21: return node.s ?? null;
+    case 22: case 23: case 24: return null;
+    case 25: {
       const inner = node.s;
       if (inner && typeof inner === 'object') {
         const obj = decode(inner);
@@ -90,11 +83,10 @@ function decode(node) {
       }
       return inner ?? null;
     }
-    case 28: case 30: return (node.a || []).map(decode);            // iterator/async iterator
-    case 31: return (node.a || []).map(decode);                     // stream
-    case 35: return (node.a || []).map(decode);                     // sequence
+    case 28: case 30: return (node.a || []).map(decode);
+    case 31: return (node.a || []).map(decode);
+    case 35: return (node.a || []).map(decode);
     default:
-      // fallbacks: try object, then scalar, then array, then null
       if (node.p && (node.p.k || node.p.v)) return decode({ t: 10, p: node.p });
       if (node.a) return (node.a || []).map(decode);
       if (node.s !== undefined) return node.s;
@@ -103,7 +95,7 @@ function decode(node) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Extract query from request
+// Extract query
 // ────────────────────────────────────────────────────────────────
 function extractQuery(req) {
   if (req.body && typeof req.body === 'object' && req.body.query) {
@@ -114,7 +106,6 @@ function extractQuery(req) {
   if (q.query) return String(q.query).trim();
   if (q.number) return String(q.number).trim();
 
-  // /num?9997774567 → { "9997774567": "" }
   for (const k of Object.keys(q)) {
     if (k === 'key' || k === 'type') continue;
     if (/^[0-9]{6,}$/.test(k)) return k;
@@ -122,7 +113,6 @@ function extractQuery(req) {
     if (typeof val === 'string' && val.length >= 6) return val.trim();
   }
 
-  // /num/9997774567
   const path = req.url || '';
   const m = path.match(/\/num\/([^/?#]+)/);
   if (m) return decodeURIComponent(m[1]).trim();
@@ -131,7 +121,7 @@ function extractQuery(req) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Upstream call — grab every frame, decode the biggest payload
+// Upstream call
 // ────────────────────────────────────────────────────────────────
 async function callUpstream(query) {
   const body = {
@@ -169,9 +159,6 @@ async function callUpstream(query) {
 
   const text = await res.text();
   const lines = text.split('\n').filter(Boolean);
-
-  // Pick the largest JSON line — that's the payload frame.
-  // The first line is usually a small header; the payload is the big one.
   let payload = text;
   if (lines.length > 1) {
     payload = lines.reduce((a, b) => (b.length > a.length ? b : a), '');
@@ -185,35 +172,81 @@ async function callUpstream(query) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Output shaper — nothing cut, everything passed through
+// Deduplicate records by their JSON signature
+// ────────────────────────────────────────────────────────────────
+function dedupe(records) {
+  const seen = new Set();
+  const out = [];
+  for (const r of records) {
+    if (!r || typeof r !== 'object') { out.push(r); continue; }
+    // stable key from sorted entries so field order doesn't matter
+    const key = Object.keys(r).sort().map(k => `${k}=${JSON.stringify(r[k])}`).join('|');
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(r);
+  }
+  return out;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Output shaper — everything passthrough + dedup
 // ────────────────────────────────────────────────────────────────
 function shape(decoded, query) {
   const result = decoded?.result || {};
   const inner  = result?.result || {};
 
-  // every raw record, untouched — no whitelist, no field removal
-  const records = Array.isArray(inner.result) ? inner.result : [];
+  // pull records
+  const rawRecords = Array.isArray(inner.result) ? inner.result : [];
+
+  // dedupe — broker sends each row multiple times
+  const records = dedupe(rawRecords);
+
+  // every non-record field from `inner` — nothing whitelisted
+  const brokerInfo = {};
+  for (const [k, v] of Object.entries(inner)) {
+    if (k === 'result') continue;   // records already pulled out
+    brokerInfo[k] = v;
+  }
 
   return {
     ok: result.ok === true,
     query,
     type: TYPE,
+
+    // top-level from outer result
     credits_left: result.creditsLeft ?? null,
     search_id: result.searchId ?? null,
+
+    // broker metadata — developer, success, status, cached,
+    // req_left, req_total, expiry, response_time, and anything new
+    broker: brokerInfo,
+
+    // convenience aliases (kept so nothing breaks)
     status: inner.status ?? null,
     cached: inner.cached ?? null,
     response_time: inner.response_time ?? null,
+    developer: inner.developer ?? null,
     broker_quota: {
       requests_left:  inner.req_left  ?? null,
       requests_total: inner.req_total ?? null,
       expiry:         inner.expiry    ?? null,
     },
-    records,                                          // ← full raw objects
+
+    // records — deduped, but complete
+    records,
     record_count: records.length,
-    // also hand back the untouched decoded upstream payload in case
-    // the operator ever adds new fields — nothing gets hidden
+    raw_record_count: rawRecords.length,
+    duplicates_removed: rawRecords.length - records.length,
+
+    // untouched raw decoded upstream — every field, including
+    // context, error flags, nested result tree
     raw_upstream: decoded ?? null,
-    error: decoded?.error?.message ?? decoded?.error ?? null,
+
+    // error — surfaced from all known locations
+    error: decoded?.error?.message
+        ?? (decoded?.error && decoded.error !== false ? decoded.error : null)
+        ?? null,
+
     made_by: 'DZ HACKER',
   };
 }
