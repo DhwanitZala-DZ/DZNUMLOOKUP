@@ -2,32 +2,56 @@
  * DZ OSINT — Phone Number Lookup
  * MADE BY DZ HACKER
  *
- * Usage:  https://dz-osint.vercel.app/num?9997774567
- *         https://dz-osint.vercel.app/num?q=9997774567
- *         https://dz-osint.vercel.app/num/9997774567
- *         https://dz-osint.vercel.app/num?9997774567&key=dz-hacker
+ * Token managed remotely via PHP (InfinityFree).
  */
 
-// ────────────────────────────────────────────────────────────────
-// CONFIG — everything hardcoded here
-// ────────────────────────────────────────────────────────────────
+const UPSTREAM      = 'https://aegisosint.lovable.app';
+const SERVER_FN     = '3537b4c4c6768e84fe0c0558f5fef63d61e1e2ef20ce24538d3ca5962aa49ff8';
+const TYPE          = 'num';
 
-const UPSTREAM    = 'https://aegisosint.lovable.app';
-const SERVER_FN   = '3537b4c4c6768e84fe0c0558f5fef63d61e1e2ef20ce24538d3ca5962aa49ff8';
-const TYPE        = 'num';
+// ─── Token provider (PHP on InfinityFree) ────────────────────────
+const TOKEN_URL     = 'https://token-donation.site.je/refresh.php';
+const DZ_SHARED_KEY = 'dz-hacker-token-master-key-2026';
 
-const JWT         = 'eyJhbGciOiJFUzI1NiIsImtpZCI6ImI5OTVlNDJkLThkMTgtNDE0MS04Yjc0LWVhM2ExZmI3ODhlZSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2Ztd2trZHRjY3RpaW1weXJhbHFwLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIzOTc1NzY2Zi0wODIwLTQzMjEtYjNmZS1mNTI5ODdmNTIzMDYiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzkwNzcwMTY1LCJpYXQiOjE3OTA3NjY1NjUsImVtYWlsIjoibWVoYXRhcmFqdUBnbWFpbC5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsIjoibWVoYXRhcmFqdUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJzdWIiOiIzOTc1NzY2Zi0wODIwLTQzMjEtYjNmZS1mNTI5ODdmNTIzMDYiLCJ1c2VybmFtZSI6Im1laGF0YXJhanUifSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc5MDc2NjU2NX1dLCJzZXNzaW9uX2lkIjoiMDZmNTU3MzYtMjAxZC00YzJlLWEzY2UtZDQwOGUzMTI1MDkyIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.KY0uWxP39gMQ6PJfCa5xWo9uA6utQRVGfNSkIrkGM4Yy2Q5DV7nDMAhM9yYi5rMxEO6K1wxiwTLe-1_mtp_20g';
+// ─── Local in-memory cache (survives warm lambda invocations) ────
+let _cachedToken  = null;
+let _cachedExpiry = 0;
 
-// Set to null to leave the endpoint open. Set to a string to require ?key=THAT
-const DZ_API_KEY  = null;
+async function getToken() {
+  const now = Math.floor(Date.now() / 1000);
 
-// ────────────────────────────────────────────────────────────────
-// Seroval framed-response decoder
-// ────────────────────────────────────────────────────────────────
+  // Reuse in-memory if still valid for 5+ minutes
+  if (_cachedToken && _cachedExpiry - now > 300) {
+    return _cachedToken;
+  }
+
+  // Ask PHP for a fresh one (it auto-refreshes if needed)
+  const res = await fetch(TOKEN_URL, {
+    headers: {
+      'X-DZ-Key': DZ_SHARED_KEY,
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Token provider returned ${res.status}: ${body.slice(0, 200)}`);
+  }
+
+  const data = await res.json();
+  if (!data.ok || !data.access_token) {
+    throw new Error(`Token provider error: ${JSON.stringify(data).slice(0, 200)}`);
+  }
+
+  _cachedToken  = data.access_token;
+  _cachedExpiry = data.expires_at || (now + 3600);
+  return _cachedToken;
+}
+
+// ─── Seroval decoder (unchanged) ─────────────────────────────────
 function decode(node) {
   if (node === null || node === undefined) return null;
   if (typeof node !== 'object') return node;
-
   switch (node.t) {
     case 0: return Number(node.s);
     case 1: return String(node.s);
@@ -94,9 +118,7 @@ function decode(node) {
   }
 }
 
-// ────────────────────────────────────────────────────────────────
-// Extract query
-// ────────────────────────────────────────────────────────────────
+// ─── Query extraction ────────────────────────────────────────────
 function extractQuery(req) {
   if (req.body && typeof req.body === 'object' && req.body.query) {
     return String(req.body.query).trim();
@@ -120,10 +142,8 @@ function extractQuery(req) {
   return null;
 }
 
-// ────────────────────────────────────────────────────────────────
-// Upstream call
-// ────────────────────────────────────────────────────────────────
-async function callUpstream(query) {
+// ─── Upstream call ───────────────────────────────────────────────
+async function callUpstream(query, token) {
   const body = {
     t: {
       t: 10, i: 0,
@@ -147,7 +167,7 @@ async function callUpstream(query) {
     method: 'POST',
     headers: {
       'accept': 'application/x-tss-framed, application/x-ndjson, application/json',
-      'authorization': `Bearer ${JWT}`,
+      'authorization': `Bearer ${token}`,
       'content-type': 'application/json',
       'x-tsr-serverfn': 'true',
       'origin': UPSTREAM,
@@ -171,9 +191,7 @@ async function callUpstream(query) {
   }
 }
 
-// ────────────────────────────────────────────────────────────────
-// Deduplicate records
-// ────────────────────────────────────────────────────────────────
+// ─── Dedupe ──────────────────────────────────────────────────────
 function dedupe(records) {
   const seen = new Set();
   const out = [];
@@ -187,24 +205,19 @@ function dedupe(records) {
   return out;
 }
 
-// ────────────────────────────────────────────────────────────────
-// Scrub any upstream developer attribution from a nested object
-// ────────────────────────────────────────────────────────────────
+// ─── Scrub "developer" ──────────────────────────────────────────
 function scrub(obj) {
   if (!obj || typeof obj !== 'object') return obj;
   if (Array.isArray(obj)) return obj.map(scrub);
   const out = {};
   for (const [k, v] of Object.entries(obj)) {
-    // drop any developer-related field — we are the only developer
     if (/^developer$/i.test(k)) continue;
     out[k] = scrub(v);
   }
   return out;
 }
 
-// ────────────────────────────────────────────────────────────────
-// Output shaper
-// ────────────────────────────────────────────────────────────────
+// ─── Shaper ──────────────────────────────────────────────────────
 function shape(decoded, query) {
   const result = decoded?.result || {};
   const inner  = result?.result || {};
@@ -212,7 +225,6 @@ function shape(decoded, query) {
   const rawRecords = Array.isArray(inner.result) ? inner.result : [];
   const records = dedupe(rawRecords);
 
-  // every non-record field from `inner` — but no developer
   const brokerInfo = {};
   for (const [k, v] of Object.entries(inner)) {
     if (k === 'result') continue;
@@ -244,7 +256,6 @@ function shape(decoded, query) {
     raw_record_count: rawRecords.length,
     duplicates_removed: rawRecords.length - records.length,
 
-    // stripped of any "developer" attribution before being echoed back
     raw_upstream: scrub(decoded) ?? null,
 
     error: decoded?.error?.message
@@ -256,9 +267,7 @@ function shape(decoded, query) {
   };
 }
 
-// ────────────────────────────────────────────────────────────────
-// Handler
-// ────────────────────────────────────────────────────────────────
+// ─── Handler ─────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -267,13 +276,6 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
   if (req.method === 'OPTIONS') return res.status(204).end();
-
-  if (DZ_API_KEY) {
-    const provided = req.headers['x-dz-key'] || req.query?.key;
-    if (provided !== DZ_API_KEY) {
-      return res.status(401).json({ ok: false, error: 'Unauthorized', made_by: 'DZ HACKER' });
-    }
-  }
 
   const query = extractQuery(req);
   if (!query) {
@@ -286,7 +288,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { parsed, raw, status, parse_error } = await callUpstream(query);
+    const token = await getToken();
+    const { parsed, raw, status, parse_error } = await callUpstream(query, token);
 
     if (parse_error) {
       return res.status(502).json({
