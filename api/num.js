@@ -172,14 +172,13 @@ async function callUpstream(query) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Deduplicate records by their JSON signature
+// Deduplicate records
 // ────────────────────────────────────────────────────────────────
 function dedupe(records) {
   const seen = new Set();
   const out = [];
   for (const r of records) {
     if (!r || typeof r !== 'object') { out.push(r); continue; }
-    // stable key from sorted entries so field order doesn't matter
     const key = Object.keys(r).sort().map(k => `${k}=${JSON.stringify(r[k])}`).join('|');
     if (seen.has(key)) continue;
     seen.add(key);
@@ -189,22 +188,35 @@ function dedupe(records) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Output shaper — everything passthrough + dedup
+// Scrub any upstream developer attribution from a nested object
+// ────────────────────────────────────────────────────────────────
+function scrub(obj) {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(scrub);
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    // drop any developer-related field — we are the only developer
+    if (/^developer$/i.test(k)) continue;
+    out[k] = scrub(v);
+  }
+  return out;
+}
+
+// ────────────────────────────────────────────────────────────────
+// Output shaper
 // ────────────────────────────────────────────────────────────────
 function shape(decoded, query) {
   const result = decoded?.result || {};
   const inner  = result?.result || {};
 
-  // pull records
   const rawRecords = Array.isArray(inner.result) ? inner.result : [];
-
-  // dedupe — broker sends each row multiple times
   const records = dedupe(rawRecords);
 
-  // every non-record field from `inner` — nothing whitelisted
+  // every non-record field from `inner` — but no developer
   const brokerInfo = {};
   for (const [k, v] of Object.entries(inner)) {
-    if (k === 'result') continue;   // records already pulled out
+    if (k === 'result') continue;
+    if (/^developer$/i.test(k)) continue;
     brokerInfo[k] = v;
   }
 
@@ -213,40 +225,33 @@ function shape(decoded, query) {
     query,
     type: TYPE,
 
-    // top-level from outer result
     credits_left: result.creditsLeft ?? null,
     search_id: result.searchId ?? null,
 
-    // broker metadata — developer, success, status, cached,
-    // req_left, req_total, expiry, response_time, and anything new
     broker: brokerInfo,
 
-    // convenience aliases (kept so nothing breaks)
     status: inner.status ?? null,
     cached: inner.cached ?? null,
     response_time: inner.response_time ?? null,
-    developer: inner.developer ?? null,
     broker_quota: {
       requests_left:  inner.req_left  ?? null,
       requests_total: inner.req_total ?? null,
       expiry:         inner.expiry    ?? null,
     },
 
-    // records — deduped, but complete
     records,
     record_count: records.length,
     raw_record_count: rawRecords.length,
     duplicates_removed: rawRecords.length - records.length,
 
-    // untouched raw decoded upstream — every field, including
-    // context, error flags, nested result tree
-    raw_upstream: decoded ?? null,
+    // stripped of any "developer" attribution before being echoed back
+    raw_upstream: scrub(decoded) ?? null,
 
-    // error — surfaced from all known locations
     error: decoded?.error?.message
         ?? (decoded?.error && decoded.error !== false ? decoded.error : null)
         ?? null,
 
+    developer: 'DZ HACKER',
     made_by: 'DZ HACKER',
   };
 }
