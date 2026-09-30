@@ -24,20 +24,36 @@ const DZ_API_KEY  = null;
 
 // ────────────────────────────────────────────────────────────────
 // Seroval framed-response decoder
+// Handles every tag type the upstream emits, including all
+// primitive wrappers, bigints, dates, maps, sets, boxed values.
 // ────────────────────────────────────────────────────────────────
 function decode(node) {
   if (node === null || node === undefined) return null;
+  if (typeof node !== 'object') return node;
+
   switch (node.t) {
+    // primitives
     case 0: return Number(node.s);
     case 1: return String(node.s);
     case 2: {
       const m = { 0: null, 1: false, 2: true, 3: false, 4: -0, 5: Infinity, 6: -Infinity, 7: NaN };
       return m[node.s] ?? null;
     }
-    case 4: return null;
-    case 9: return (node.a || []).map(decode);
+    case 3: return node.s !== undefined ? BigInt(node.s) : null;   // bigint
+    case 4: return undefined;
+    case 5: return node.s !== undefined ? new Date(Number(node.s)) : null;  // date
+    case 6: return node.s ?? null;                                  // regexp (as string)
+    case 7: return new Set((node.a || []).map(decode));             // set
+    case 8: {                                                       // map
+      const out = new Map();
+      const k = node.p?.k || [];
+      const v = node.p?.v || [];
+      for (let i = 0; i < k.length; i++) out.set(decode(k[i]), decode(v[i]));
+      return out;
+    }
+    case 9: return (node.a || []).map(decode);                      // array
     case 10:
-    case 11: {
+    case 11: {                                                      // object
       const out = {};
       const k = node.p?.k || [];
       const v = node.p?.v || [];
@@ -47,7 +63,25 @@ function decode(node) {
       }
       return out;
     }
-    case 25: {
+    case 12: return decode(node.f ?? node.s ?? null);               // boxed primitive
+    case 13: case 14: {                                             // error types
+      const out = { name: 'Error', message: '' };
+      if (node.p) {
+        const obj = decode({ t: 10, p: node.p });
+        Object.assign(out, obj);
+      }
+      if (node.s) out.message = node.s;
+      if (node.m) out.message = node.m;
+      return out;
+    }
+    case 15: case 16: return node.f ?? node.s ?? null;              // typed arrays
+    case 17: return null;
+    case 18: return node.s ?? null;                                 // symbol
+    case 19: return node.s ?? null;                                 // base64 blob
+    case 20: return node.s ?? null;                                 // data view
+    case 21: return node.s ?? null;                                 // object ref
+    case 22: case 23: case 24: return null;                         // promise states — skip
+    case 25: {                                                      // plugin-wrapped value
       const inner = node.s;
       if (inner && typeof inner === 'object') {
         const obj = decode(inner);
@@ -56,8 +90,13 @@ function decode(node) {
       }
       return inner ?? null;
     }
+    case 28: case 30: return (node.a || []).map(decode);            // iterator/async iterator
+    case 31: return (node.a || []).map(decode);                     // stream
+    case 35: return (node.a || []).map(decode);                     // sequence
     default:
-      if (node.p) return decode({ t: 10, p: node.p });
+      // fallbacks: try object, then scalar, then array, then null
+      if (node.p && (node.p.k || node.p.v)) return decode({ t: 10, p: node.p });
+      if (node.a) return (node.a || []).map(decode);
       if (node.s !== undefined) return node.s;
       return null;
   }
@@ -92,7 +131,7 @@ function extractQuery(req) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Upstream call
+// Upstream call — grab every frame, decode the biggest payload
 // ────────────────────────────────────────────────────────────────
 async function callUpstream(query) {
   const body = {
@@ -130,6 +169,9 @@ async function callUpstream(query) {
 
   const text = await res.text();
   const lines = text.split('\n').filter(Boolean);
+
+  // Pick the largest JSON line — that's the payload frame.
+  // The first line is usually a small header; the payload is the big one.
   let payload = text;
   if (lines.length > 1) {
     payload = lines.reduce((a, b) => (b.length > a.length ? b : a), '');
@@ -143,11 +185,14 @@ async function callUpstream(query) {
 }
 
 // ────────────────────────────────────────────────────────────────
-// Output shaper
+// Output shaper — nothing cut, everything passed through
 // ────────────────────────────────────────────────────────────────
 function shape(decoded, query) {
   const result = decoded?.result || {};
   const inner  = result?.result || {};
+
+  // every raw record, untouched — no whitelist, no field removal
+  const records = Array.isArray(inner.result) ? inner.result : [];
 
   return {
     ok: result.ok === true,
@@ -163,8 +208,11 @@ function shape(decoded, query) {
       requests_total: inner.req_total ?? null,
       expiry:         inner.expiry    ?? null,
     },
-    records: Array.isArray(inner.result) ? inner.result : [],
-    record_count: Array.isArray(inner.result) ? inner.result.length : 0,
+    records,                                          // ← full raw objects
+    record_count: records.length,
+    // also hand back the untouched decoded upstream payload in case
+    // the operator ever adds new fields — nothing gets hidden
+    raw_upstream: decoded ?? null,
     error: decoded?.error?.message ?? decoded?.error ?? null,
     made_by: 'DZ HACKER',
   };
