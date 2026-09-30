@@ -1,17 +1,43 @@
 /**
  * DZ OSINT — Phone Number Lookup
  * MADE BY DZ HACKER
+ *
+ * Public URL:  https://dz-osint.vercel.app/num?9997774567
+ *              https://dz-osint.vercel.app/num?q=9997774567
+ *              https://dz-osint.vercel.app/num/9997774567
+ *
+ * Self-contained. No PHP, no env vars, no external token server.
+ * Signs into Supabase directly with email/password, caches the
+ * JWT in module-level memory, refreshes on expiry automatically.
  */
 
-const UPSTREAM      = 'https://aegisosint.lovable.app';
-const SERVER_FN     = '3537b4c4c6768e84fe0c0558f5fef63d61e1e2ef20ce24538d3ca5962aa49ff8';
-const TYPE          = 'num';
-const TOKEN_SERVER  = 'https://token-donation.site.je/refresh.php';
+const UPSTREAM   = 'https://aegisosint.lovable.app';
+const SERVER_FN  = '3537b4c4c6768e84fe0c0558f5fef63d61e1e2ef20ce24538d3ca5962aa49ff8';
+const TYPE       = 'num';
 
-const DZ_KEY           = null;
-const TOKEN_SERVER_KEY = null;
+const SUPABASE_URL = 'https://fmwkkdtcctiimpyralqp.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_U1wer0BS1yGg30h6M-1DZQ_Wv_lWKaD';
 
-// ─── Seroval decoder ─────────────────────────────────────────────
+// Your account — sign in fresh whenever token needs refresh
+const AUTH_EMAIL    = 'mehataraju@gmail.com';
+const AUTH_PASSWORD = 'mehata123123';
+
+// Optional gate on the public endpoint
+const DZ_KEY = null;   // set to 'secret' to require ?key=secret
+
+// ────────────────────────────────────────────────────────────────
+// In-memory token cache (survives warm invocations of this lambda)
+// ────────────────────────────────────────────────────────────────
+let cached = {
+  access_token: null,
+  refresh_token: null,
+  expires_at: 0,          // unix seconds
+  refreshing: null,       // Promise while a refresh is in flight
+};
+
+// ────────────────────────────────────────────────────────────────
+// Seroval decoder
+// ────────────────────────────────────────────────────────────────
 function decode(node) {
   if (node === null || node === undefined) return null;
   if (typeof node !== 'object') return node;
@@ -74,7 +100,9 @@ function decode(node) {
   }
 }
 
-// ─── Extract query ───────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// Extract query string
+// ────────────────────────────────────────────────────────────────
 function extractQuery(req) {
   if (req.body && typeof req.body === 'object' && req.body.query) {
     return String(req.body.query).trim();
@@ -94,111 +122,96 @@ function extractQuery(req) {
   return null;
 }
 
-// ─── ROBUST JSON PARSER ──────────────────────────────────────────
-// Strips InfinityFree ad injections, PHP warnings, BOMs, and
-// extracts the first {...} block that parses as JSON.
-function parseLooseJson(text) {
-  if (!text) return null;
-
-  // Strip UTF-8 BOM
-  text = text.replace(/^\uFEFF/, '');
-
-  // Try direct parse first
-  try { return JSON.parse(text); } catch {}
-
-  // Try to find first '{' and matching '}'
-  const first = text.indexOf('{');
-  if (first === -1) return null;
-
-  // Walk to matching close brace
-  let depth = 0, inStr = false, esc = false, end = -1;
-  for (let i = first; i < text.length; i++) {
-    const c = text[i];
-    if (inStr) {
-      if (esc) { esc = false; continue; }
-      if (c === '\\') { esc = true; continue; }
-      if (c === '"') { inStr = false; continue; }
-    } else {
-      if (c === '"') { inStr = true; continue; }
-      if (c === '{') depth++;
-      else if (c === '}') {
-        depth--;
-        if (depth === 0) { end = i + 1; break; }
-      }
-    }
+// ────────────────────────────────────────────────────────────────
+// Supabase auth calls
+// ────────────────────────────────────────────────────────────────
+async function supabaseAuth(body) {
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=${body.grant_type}`, {
+    method: 'POST',
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.access_token) {
+    const msg = data.error_description || data.error || data.msg || `HTTP ${res.status}`;
+    throw new Error(msg);
   }
-
-  if (end === -1) return null;
-
-  const slice = text.slice(first, end);
-  try { return JSON.parse(slice); } catch { return null; }
+  return data;
 }
 
-// ─── Fetch JWT from PHP with 503 retry ───────────────────────────
-async function getToken(retries = 3) {
-  let lastDiagnostic = null;
+function tokensFromResponse(r) {
+  return {
+    access_token: r.access_token,
+    refresh_token: r.refresh_token,
+    expires_at: r.expires_at || (Math.floor(Date.now() / 1000) + (r.expires_in || 3600)),
+  };
+}
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    const url = TOKEN_SERVER_KEY
-      ? `${TOKEN_SERVER}?key=${encodeURIComponent(TOKEN_SERVER_KEY)}`
-      : TOKEN_SERVER;
+function isExpired(exp, bufferSec = 60) {
+  return !exp || (Math.floor(Date.now() / 1000) + bufferSec) >= exp;
+}
 
-    let res, rawText = '';
+// ────────────────────────────────────────────────────────────────
+// Get a live access token (cached + auto-refresh + dedup)
+// ────────────────────────────────────────────────────────────────
+async function getAccessToken() {
+  // Fast path — cached token still valid
+  if (cached.access_token && !isExpired(cached.expires_at)) {
+    return cached.access_token;
+  }
+
+  // If a refresh is already in flight, wait on it
+  if (cached.refreshing) {
+    await cached.refreshing;
+    return cached.access_token;
+  }
+
+  // Start a refresh
+  cached.refreshing = (async () => {
     try {
-      res = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'accept': 'application/json',
-          'user-agent': 'DZ-OSINT/1.0',
-        },
+      // Prefer refresh_token if we have one
+      if (cached.refresh_token) {
+        try {
+          const r = await supabaseAuth({
+            grant_type: 'refresh_token',
+            refresh_token: cached.refresh_token,
+          });
+          Object.assign(cached, tokensFromResponse(r));
+          return;
+        } catch {
+          // Refresh token dead — fall through to password sign-in
+          cached.refresh_token = null;
+        }
+      }
+
+      // Full sign-in with password
+      const r = await supabaseAuth({
+        grant_type: 'password',
+        email: AUTH_EMAIL,
+        password: AUTH_PASSWORD,
       });
-      rawText = await res.text();
-    } catch (err) {
-      lastDiagnostic = 'network error: ' + err.message;
-      if (attempt < retries) {
-        await new Promise(r => setTimeout(r, 2000));
-        continue;
-      }
-      throw new Error(lastDiagnostic);
+      Object.assign(cached, tokensFromResponse(r));
+    } finally {
+      cached.refreshing = null;
     }
+  })();
 
-    // Debug: log the first chunk of whatever PHP said
-    console.log('[DZ] PHP status:', res.status, 'body start:', rawText.slice(0, 300));
-
-    const data = parseLooseJson(rawText);
-
-    if (!data) {
-      lastDiagnostic = `PHP returned ${res.status} with non-JSON body: ${rawText.slice(0, 120)}`;
-      if (attempt < retries) {
-        await new Promise(r => setTimeout(r, 1500));
-        continue;
-      }
-      throw new Error(lastDiagnostic);
-    }
-
-    // 503 → PHP is refreshing
-    if (res.status === 503) {
-      const wait = Math.min(Number(data.retry_after) || 5, 15);
-      if (attempt < retries) {
-        await new Promise(r => setTimeout(r, wait * 1000));
-        continue;
-      }
-      throw new Error('token refresh timed out');
-    }
-
-    if (data.ok === true && data.access_token) {
-      return data.access_token;
-    }
-
-    // PHP returned valid JSON but ok:false
-    lastDiagnostic = data.error || `PHP returned ok:false with no message`;
-    throw new Error(lastDiagnostic);
+  try {
+    await cached.refreshing;
+  } catch (err) {
+    throw new Error('auth failed: ' + err.message);
   }
 
-  throw new Error(lastDiagnostic || 'token unavailable after retries');
+  if (!cached.access_token) throw new Error('no access token after refresh');
+  return cached.access_token;
 }
 
-// ─── Call upstream ───────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// Call upstream OSINT API
+// ────────────────────────────────────────────────────────────────
 async function callUpstream(query, token) {
   const body = {
     t: {
@@ -239,11 +252,16 @@ async function callUpstream(query, token) {
   if (lines.length > 1) {
     payload = lines.reduce((a, b) => (b.length > a.length ? b : a), '');
   }
-  try { return { parsed: JSON.parse(payload), status: res.status }; }
-  catch { return { raw: text, status: res.status, parse_error: true }; }
+  try {
+    return { parsed: JSON.parse(payload), status: res.status };
+  } catch {
+    return { raw: text, status: res.status, parse_error: true };
+  }
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// Helpers
+// ────────────────────────────────────────────────────────────────
 function dedupe(records) {
   const seen = new Set(); const out = [];
   for (const r of records) {
@@ -267,7 +285,9 @@ function scrub(obj) {
   return out;
 }
 
-// ─── Shape output ────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// Shape output
+// ────────────────────────────────────────────────────────────────
 function shape(decoded, query) {
   const result = decoded?.result || {};
   const inner  = result?.result || {};
@@ -309,7 +329,9 @@ function shape(decoded, query) {
   };
 }
 
-// ─── Handler ─────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// Handler
+// ────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -336,18 +358,19 @@ export default async function handler(req, res) {
     });
   }
 
+  // 1) Get a live JWT (cached, auto-refreshed)
   let token;
   try {
-    token = await getToken();
+    token = await getAccessToken();
   } catch (err) {
     return res.status(503).json({
       ok: false,
-      error: 'token unavailable: ' + err.message,
-      retry_after: 5,
+      error: 'auth unavailable: ' + err.message,
       made_by: 'DZ HACKER',
     });
   }
 
+  // 2) Call upstream
   try {
     const { parsed, raw, status, parse_error } = await callUpstream(query, token);
     if (parse_error) {
