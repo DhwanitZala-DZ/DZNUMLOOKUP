@@ -5,16 +5,26 @@
  * Usage:  https://dz-osint.vercel.app/num?9997774567
  *         https://dz-osint.vercel.app/num?q=9997774567
  *         https://dz-osint.vercel.app/num/9997774567
+ *         https://dz-osint.vercel.app/num?9997774567&key=dz-hacker
  */
 
-const UPSTREAM = 'https://aegisosint.lovable.app';
-const SERVER_FN = '3537b4c4c6768e84fe0c0558f5fef63d61e1e2ef20ce24538d3ca5962aa49ff8';
-const TYPE = 'num';
+// ────────────────────────────────────────────────────────────────
+// CONFIG — everything hardcoded here
+// ────────────────────────────────────────────────────────────────
 
-const JWT = process.env.OSINT_JWT || null;
-const DZ_API_KEY = process.env.DZ_API_KEY || null;
+const UPSTREAM    = 'https://aegisosint.lovable.app';
+const SERVER_FN   = '3537b4c4c6768e84fe0c0558f5fef63d61e1e2ef20ce24538d3ca5962aa49ff8';
+const TYPE        = 'num';
 
-// ─── Seroval decoder ─────────────────────────────────────────────
+// Your Supabase access token — refresh this when it expires (~1 hour)
+const JWT         = 'eyJhbGciOiJFUzI1NiIsImtpZCI6ImI5OTVlNDJkLThkMTgtNDE0MS04Yjc0LWVhM2ExZmI3ODhlZSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJodHRwczovL2Ztd2trZHRjY3RpaW1weXJhbHFwLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIzOTc1NzY2Zi0wODIwLTQzMjEtYjNmZS1mNTI5ODdmNTIzMDYiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzkwNzcwMTY1LCJpYXQiOjE3OTA3NjY1NjUsImVtYWlsIjoibWVoYXRhcmFqdUBnbWFpbC5jb20iLCJwaG9uZSI6IiIsImFwcF9tZXRhZGF0YSI6eyJwcm92aWRlciI6ImVtYWlsIiwicHJvdmlkZXJzIjpbImVtYWlsIl19LCJ1c2VyX21ldGFkYXRhIjp7ImVtYWlsIjoibWVoYXRhcmFqdUBnbWFpbC5jb20iLCJlbWFpbF92ZXJpZmllZCI6dHJ1ZSwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJzdWIiOiIzOTc1NzY2Zi0wODIwLTQzMjEtYjNmZS1mNTI5ODdmNTIzMDYiLCJ1c2VybmFtZSI6Im1laGF0YXJhanUifSwicm9sZSI6ImF1dGhlbnRpY2F0ZWQiLCJhYWwiOiJhYWwxIiwiYW1yIjpbeyJtZXRob2QiOiJwYXNzd29yZCIsInRpbWVzdGFtcCI6MTc5MDc2NjU2NX1dLCJzZXNzaW9uX2lkIjoiMDZmNTU3MzYtMjAxZC00YzJlLWEzY2UtZDQwOGUzMTI1MDkyIiwiaXNfYW5vbnltb3VzIjpmYWxzZX0.KY0uWxP39gMQ6PJfCa5xWo9uA6utQRVGfNSkIrkGM4Yy2Q5DV7nDMAhM9yYi5rMxEO6K1wxiwTLe-1_mtp_20g';
+
+// Set to null to leave the endpoint open. Set to a string to require ?key=THAT
+const DZ_API_KEY  = null;
+
+// ────────────────────────────────────────────────────────────────
+// Seroval framed-response decoder
+// ────────────────────────────────────────────────────────────────
 function decode(node) {
   if (node === null || node === undefined) return null;
   switch (node.t) {
@@ -53,7 +63,9 @@ function decode(node) {
   }
 }
 
-// ─── Query extraction ────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// Extract query from request
+// ────────────────────────────────────────────────────────────────
 function extractQuery(req) {
   if (req.body && typeof req.body === 'object' && req.body.query) {
     return String(req.body.query).trim();
@@ -63,7 +75,7 @@ function extractQuery(req) {
   if (q.query) return String(q.query).trim();
   if (q.number) return String(q.number).trim();
 
-  // /num?9997774567 → q = { "9997774567": "" }
+  // /num?9997774567 → { "9997774567": "" }
   for (const k of Object.keys(q)) {
     if (k === 'key' || k === 'type') continue;
     if (/^[0-9]{6,}$/.test(k)) return k;
@@ -79,8 +91,10 @@ function extractQuery(req) {
   return null;
 }
 
-// ─── Upstream call ───────────────────────────────────────────────
-async function callUpstream(query, token) {
+// ────────────────────────────────────────────────────────────────
+// Upstream call
+// ────────────────────────────────────────────────────────────────
+async function callUpstream(query) {
   const body = {
     t: {
       t: 10, i: 0,
@@ -104,7 +118,7 @@ async function callUpstream(query, token) {
     method: 'POST',
     headers: {
       'accept': 'application/x-tss-framed, application/x-ndjson, application/json',
-      'authorization': `Bearer ${token}`,
+      'authorization': `Bearer ${JWT}`,
       'content-type': 'application/json',
       'x-tsr-serverfn': 'true',
       'origin': UPSTREAM,
@@ -128,10 +142,12 @@ async function callUpstream(query, token) {
   }
 }
 
-// ─── Output shaper ───────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// Output shaper
+// ────────────────────────────────────────────────────────────────
 function shape(decoded, query) {
   const result = decoded?.result || {};
-  const inner = result?.result || {};
+  const inner  = result?.result || {};
 
   return {
     ok: result.ok === true,
@@ -143,9 +159,9 @@ function shape(decoded, query) {
     cached: inner.cached ?? null,
     response_time: inner.response_time ?? null,
     broker_quota: {
-      requests_left: inner.req_left ?? null,
+      requests_left:  inner.req_left  ?? null,
       requests_total: inner.req_total ?? null,
-      expiry: inner.expiry ?? null,
+      expiry:         inner.expiry    ?? null,
     },
     records: Array.isArray(inner.result) ? inner.result : [],
     record_count: Array.isArray(inner.result) ? inner.result.length : 0,
@@ -154,7 +170,9 @@ function shape(decoded, query) {
   };
 }
 
-// ─── Handler ─────────────────────────────────────────────────────
+// ────────────────────────────────────────────────────────────────
+// Handler
+// ────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -181,16 +199,9 @@ export default async function handler(req, res) {
     });
   }
 
-  if (!JWT) {
-    return res.status(500).json({
-      ok: false,
-      error: 'Server misconfigured: OSINT_JWT env var is not set',
-      made_by: 'DZ HACKER',
-    });
-  }
-
   try {
-    const { parsed, raw, status, parse_error } = await callUpstream(query, JWT);
+    const { parsed, raw, status, parse_error } = await callUpstream(query);
+
     if (parse_error) {
       return res.status(502).json({
         ok: false,
@@ -200,6 +211,7 @@ export default async function handler(req, res) {
         made_by: 'DZ HACKER',
       });
     }
+
     const out = shape(decode(parsed), query);
     return res.status(out.ok ? 200 : 402).json(out);
   } catch (err) {
