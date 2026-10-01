@@ -78,9 +78,20 @@ function extractPlate(query) {
   return '';
 }
 
-// route the target through the worker
-function viaWorker(targetUrl) {
-  return `${WORKER_BASE.replace(/\/+$/, '')}/?url=${encodeURIComponent(targetUrl)}`;
+// route the target through the worker.
+// When headersOverride is provided, headers are ALSO encoded as h_* query
+// params so the worker can re-attach them even if its forwarder strips them.
+function viaWorker(targetUrl, headersOverride) {
+  const base = WORKER_BASE.replace(/\/+$/, '');
+  let url = `${base}/?url=${encodeURIComponent(targetUrl)}`;
+
+  if (headersOverride && typeof headersOverride === 'object') {
+    for (const [k, v] of Object.entries(headersOverride)) {
+      if (v === undefined || v === null || v === '') continue;
+      url += `&h_${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`;
+    }
+  }
+  return url;
 }
 
 // retry on 403/429
@@ -123,28 +134,44 @@ export default async function handler(req, res) {
     `&partner_code=&mobile_no=${mobile}` +
     `&source=apex&originData=false`;
 
-  const relayUrl = viaWorker(target);
+  // headers that must land on RenewBuy exactly as-is
+  const forwardedHeaders = {
+    'User-Agent':
+      'Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0',
+    Accept: 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Accept-Encoding': 'gzip, deflate, br, zstd',
+    Authorization: 'null',
+    Connection: 'keep-alive',
+    Referer:
+      `https://apex.renewbuyinsurance.com/motor/?reg_no=${refererPlate}` +
+      `&mobile_no=9999999999&vehicle=fourWheeler`,
+    Cookie: COOKIES,
+    'Sec-Fetch-Dest': 'empty',
+    'Sec-Fetch-Mode': 'cors',
+    'Sec-Fetch-Site': 'same-origin',
+    Pragma: 'no-cache',
+    'Cache-Control': 'no-cache',
+    TE: 'trailers',
+  };
+
+  const relayUrl = viaWorker(target, forwardedHeaders);
 
   const opts = {
     method: 'GET',
     headers: {
-      'User-Agent':
-        'Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0',
+      // headers passed on the relay call itself — the worker reads these
+      // too, so both paths (real headers + h_* query params) work.
+      'User-Agent': forwardedHeaders['User-Agent'],
       Accept: 'application/json, text/plain, */*',
-      'Accept-Language': 'en-US,en;q=0.5',
-      'Accept-Encoding': 'gzip, deflate, br, zstd',
-      Authorization: 'null',
-      Connection: 'keep-alive',
-      Referer:
-        `https://apex.renewbuyinsurance.com/motor/?reg_no=${refererPlate}` +
-        `&mobile_no=9999999999&vehicle=fourWheeler`,
-      Cookie: COOKIES,
-      'Sec-Fetch-Dest': 'empty',
-      'Sec-Fetch-Mode': 'cors',
-      'Sec-Fetch-Site': 'same-origin',
-      Pragma: 'no-cache',
-      'Cache-Control': 'no-cache',
-      TE: 'trailers',
+      'Accept-Language': forwardedHeaders['Accept-Language'],
+      'Accept-Encoding': forwardedHeaders['Accept-Encoding'],
+      Authorization: forwardedHeaders.Authorization,
+      Referer: forwardedHeaders.Referer,
+      Cookie: forwardedHeaders.Cookie,
+      TE: forwardedHeaders.TE,
+      Pragma: forwardedHeaders.Pragma,
+      'Cache-Control': forwardedHeaders['Cache-Control'],
     },
   };
 
