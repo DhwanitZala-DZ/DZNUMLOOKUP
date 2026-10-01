@@ -1,7 +1,11 @@
 // api/veh.js
-// Vaahan lookup proxy — /veh?GJ01KP8982
+// Vaahan lookup — routed through Cloudflare Worker relay
 // Made by DZ HACKER
 
+// Cloudflare Worker relay (yours, from api.php _dzr())
+const WORKER_BASE = 'https://token.rajveeguest.workers.dev';
+
+// Upstream target — RenewBuy Vaahan API
 const TARGET = 'https://apex.renewbuyinsurance.com/api/v1/vaahan/registration_number/';
 
 const COOKIES =
@@ -10,11 +14,12 @@ const COOKIES =
   '_ga=GA1.1.431162022.1790870475; ' +
   'location=block';
 
-const RTO_STATES = [
-  'GJ','MH','DL','KA','TN','UP','RJ','MP','WB','AP','TS','KL','HR','PB','BR','OR','AS','JH','CG','UK'
-];
-const LETTERS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const RTO_STATES = ['GJ','MH','DL','KA','TN','UP','RJ','MP','WB','AP','TS','KL','HR','PB','BR','OR','AS','JH','CG','UK'];
+const LETTERS    = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
+/* ---------- helpers ---------- */
+
+// fake 10-digit number, never starts with 6-9
 function fakeMobile() {
   const first = Math.floor(Math.random() * 6); // 0..5
   let rest = '';
@@ -22,14 +27,14 @@ function fakeMobile() {
   return `${first}${rest}`;
 }
 
-// random valid-looking Indian plate, guaranteed different from `avoid`
+// random plate that is never equal to the one being queried
 function fakePlate(avoid) {
   for (let i = 0; i < 20; i++) {
-    const st = RTO_STATES[Math.floor(Math.random() * RTO_STATES.length)];
+    const st   = RTO_STATES[Math.floor(Math.random() * RTO_STATES.length)];
     const dist = String(Math.floor(Math.random() * 99) + 1).padStart(2, '0');
-    const a = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-    const b = LETTERS[Math.floor(Math.random() * LETTERS.length)];
-    const num = String(Math.floor(Math.random() * 9000) + 1000);
+    const a    = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+    const b    = LETTERS[Math.floor(Math.random() * LETTERS.length)];
+    const num  = String(Math.floor(Math.random() * 9000) + 1000);
     const plate = `${st}${dist}${a}${b}${num}`;
     if (plate !== avoid) return plate;
   }
@@ -44,43 +49,52 @@ function cleanPlate(input) {
 
 const PLATE_RE = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/;
 
+// handle /veh?GJ01KP8982, /veh?regn_no=..., /veh?regn=..., etc.
 function extractPlate(query) {
   if (!query || typeof query !== 'object') return '';
-  if (query.regn_no) return query.regn_no;
-  if (query.regn) return query.regn;
 
-  const keys = Object.keys(query);
+  if (query.regn_no) return query.regn_no;
+  if (query.regn)    return query.regn;
+
+  const keys   = Object.keys(query);
   const values = Object.values(query);
 
   for (const k of keys) {
-    const cleaned = cleanPlate(k);
-    if (PLATE_RE.test(cleaned)) return cleaned;
+    const c = cleanPlate(k);
+    if (PLATE_RE.test(c)) return c;
   }
   for (const v of values) {
-    const cleaned = cleanPlate(v);
-    if (PLATE_RE.test(cleaned)) return cleaned;
+    const c = cleanPlate(v);
+    if (PLATE_RE.test(c)) return c;
   }
   for (const k of keys) {
-    const cleaned = cleanPlate(k);
-    if (cleaned.length >= 6) return cleaned;
+    const c = cleanPlate(k);
+    if (c.length >= 6) return c;
   }
   for (const v of values) {
-    const cleaned = cleanPlate(v);
-    if (cleaned.length >= 6) return cleaned;
+    const c = cleanPlate(v);
+    if (c.length >= 6) return c;
   }
   return '';
 }
 
+// route the target through the worker
+function viaWorker(targetUrl) {
+  return `${WORKER_BASE.replace(/\/+$/, '')}/?url=${encodeURIComponent(targetUrl)}`;
+}
+
+// retry on 403/429
 async function fetchWithRetry(url, opts, tries = 3) {
   let last;
   for (let i = 0; i < tries; i++) {
-    const r = await fetch(url, opts);
-    last = r;
-    if (r.status !== 403 && r.status !== 429) return r;
-    await new Promise(res => setTimeout(res, 700 + Math.random() * 1200));
+    last = await fetch(url, opts);
+    if (last.status !== 403 && last.status !== 429) return last;
+    await new Promise(r => setTimeout(r, 700 + Math.random() * 1200));
   }
   return last;
 }
+
+/* ---------- handler ---------- */
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -101,14 +115,15 @@ export default async function handler(req, res) {
     });
   }
 
-  const mobile = fakeMobile();
-  // referer plate must NOT equal the queried plate
+  const mobile       = fakeMobile();
   const refererPlate = fakePlate(plate);
 
-  const url =
+  const target =
     `${TARGET}?regn_no=${encodeURIComponent(plate)}` +
     `&partner_code=&mobile_no=${mobile}` +
     `&source=apex&originData=false`;
+
+  const relayUrl = viaWorker(target);
 
   const opts = {
     method: 'GET',
@@ -129,33 +144,35 @@ export default async function handler(req, res) {
       'Sec-Fetch-Site': 'same-origin',
       Pragma: 'no-cache',
       'Cache-Control': 'no-cache',
-      'TE': 'trailers',
+      TE: 'trailers',
     },
   };
 
   try {
-    const upstream = await fetchWithRetry(url, opts);
+    const upstream = await fetchWithRetry(relayUrl, opts);
     const text = await upstream.text();
 
     let data;
     try { data = JSON.parse(text); } catch { data = { raw: text }; }
 
     return res.status(upstream.status).json({
-      _made_by: 'DZ HACKER',
+      _made_by:        'DZ HACKER',
       _requested_regn: plate,
-      _referer_regn: refererPlate,
-      _mobile_used: mobile,
+      _referer_regn:   refererPlate,
+      _mobile_used:    mobile,
+      _relay:          WORKER_BASE,
       _upstream_status: upstream.status,
-      _timestamp: new Date().toISOString(),
+      _timestamp:      new Date().toISOString(),
       data,
     });
   } catch (err) {
     return res.status(502).json({
-      _made_by: 'DZ HACKER',
+      _made_by:        'DZ HACKER',
       _requested_regn: plate,
-      _referer_regn: refererPlate,
-      _mobile_used: mobile,
-      _error: err.message || 'upstream failed',
+      _referer_regn:   refererPlate,
+      _mobile_used:    mobile,
+      _relay:          WORKER_BASE,
+      _error:          err.message || 'upstream failed',
     });
   }
 }
