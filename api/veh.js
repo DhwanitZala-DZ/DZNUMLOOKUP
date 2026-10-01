@@ -79,19 +79,21 @@ function extractPlate(query) {
 }
 
 // route the target through the worker.
-// When headersOverride is provided, headers are ALSO encoded as h_* query
-// params so the worker can re-attach them even if its forwarder strips them.
+// Every header in headersOverride is ALSO encoded as an h_* query param,
+// so the worker can re-attach it even if the calling runtime strips it.
 function viaWorker(targetUrl, headersOverride) {
   const base = WORKER_BASE.replace(/\/+$/, '');
-  let url = `${base}/?url=${encodeURIComponent(targetUrl)}`;
+  const params = new URLSearchParams();
+  params.set('url', targetUrl);
 
   if (headersOverride && typeof headersOverride === 'object') {
     for (const [k, v] of Object.entries(headersOverride)) {
       if (v === undefined || v === null || v === '') continue;
-      url += `&h_${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`;
+      params.set(`h_${k}`, String(v));
     }
   }
-  return url;
+
+  return `${base}/?${params.toString()}`;
 }
 
 // retry on 403/429
@@ -134,45 +136,35 @@ export default async function handler(req, res) {
     `&partner_code=&mobile_no=${mobile}` +
     `&source=apex&originData=false`;
 
-  // headers that must land on RenewBuy exactly as-is
+  // the complete set of headers RenewBuy's WAF expects.
+  // every one of these is also mirrored into h_* query params below.
   const forwardedHeaders = {
     'User-Agent':
       'Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0',
-    Accept: 'application/json, text/plain, */*',
+    'Accept': 'application/json, text/plain, */*',
     'Accept-Language': 'en-US,en;q=0.5',
     'Accept-Encoding': 'gzip, deflate, br, zstd',
-    Authorization: 'null',
-    Connection: 'keep-alive',
-    Referer:
+    'Authorization': 'null',
+    'Connection': 'keep-alive',
+    'Referer':
       `https://apex.renewbuyinsurance.com/motor/?reg_no=${refererPlate}` +
       `&mobile_no=9999999999&vehicle=fourWheeler`,
-    Cookie: COOKIES,
+    'Cookie': COOKIES,
     'Sec-Fetch-Dest': 'empty',
     'Sec-Fetch-Mode': 'cors',
     'Sec-Fetch-Site': 'same-origin',
-    Pragma: 'no-cache',
+    'Pragma': 'no-cache',
     'Cache-Control': 'no-cache',
-    TE: 'trailers',
+    'TE': 'trailers',
   };
 
+  // URL carries every header as h_* param so nothing gets stripped in transit
   const relayUrl = viaWorker(target, forwardedHeaders);
 
+  // the relay call itself carries the same real headers too — belt and suspenders
   const opts = {
     method: 'GET',
-    headers: {
-      // headers passed on the relay call itself — the worker reads these
-      // too, so both paths (real headers + h_* query params) work.
-      'User-Agent': forwardedHeaders['User-Agent'],
-      Accept: 'application/json, text/plain, */*',
-      'Accept-Language': forwardedHeaders['Accept-Language'],
-      'Accept-Encoding': forwardedHeaders['Accept-Encoding'],
-      Authorization: forwardedHeaders.Authorization,
-      Referer: forwardedHeaders.Referer,
-      Cookie: forwardedHeaders.Cookie,
-      TE: forwardedHeaders.TE,
-      Pragma: forwardedHeaders.Pragma,
-      'Cache-Control': forwardedHeaders['Cache-Control'],
-    },
+    headers: forwardedHeaders,
   };
 
   try {
