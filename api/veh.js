@@ -1,40 +1,61 @@
-// api/vaahan.js
-// Vercel serverless proxy for RenewBuy Vaahan lookup
+// api/veh.js
+// Vaahan lookup proxy — /veh?GJ01KP8982
 // Made by DZ HACKER
 
 const TARGET = 'https://apex.renewbuyinsurance.com/api/v1/vaahan/registration_number/';
 
-// generate a fake 10-digit number that does NOT start with 6-9
-// so it starts with 0-5, and is 10 digits total
+// fake 10-digit number, never starts with 6-9
 function fakeMobile() {
   const first = Math.floor(Math.random() * 6); // 0..5
   let rest = '';
-  for (let i = 0; i < 9; i++) {
-    rest += Math.floor(Math.random() * 10);
-  }
+  for (let i = 0; i < 9; i++) rest += Math.floor(Math.random() * 10);
   return `${first}${rest}`;
 }
 
-export default async function handler(req, res) {
-  // CORS so you can call it from anywhere
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', '*');
+// normalise plate: strip everything non-alnum, uppercase
+function cleanPlate(input) {
+  return String(input || '')
+    .replace(/[^a-zA-Z0-9]/g, '')
+    .toUpperCase();
+}
 
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-dz-key');
+  res.setHeader('X-Powered-By', 'DZ HACKER');
+
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  // grab the first query value, whatever its key is
+  // supports: /veh?GJ01KP8982, /veh?regn_no=GJ01KP8982, /veh?regn=GJ01KP8982
+  const rawQuery =
+    req.query.regn_no ||
+    req.query.regn ||
+    req.query.regn_no === '' ? req.query.regn_no :
+    Object.keys(req.query)[0];
+
+  const plateCandidate =
+    req.query.regn_no ||
+    req.query.regn ||
+    Object.values(req.query)[0] ||
+    '';
+
+  const plate = cleanPlate(plateCandidate);
+
+  if (!plate || plate.length < 6) {
+    return res.status(400).json({
+      _made_by: 'DZ HACKER',
+      _error: 'missing or invalid registration number',
+      _hint: 'usage: /veh?GJ01KP8982',
+      _received_query: req.query,
+    });
   }
 
-  const regn = req.query.regn_no || req.query.regn || 'GJ-01-KP-8982';
-
-  // fresh mobile per request
   const mobile = fakeMobile();
 
-  // split plate so it works whether you pass GJ-01-KP-8982 or GJ01KP8982
-  const clean = String(regn).replace(/-/g, '').toUpperCase();
-
   const url =
-    `${TARGET}?regn_no=${encodeURIComponent(clean)}` +
+    `${TARGET}?regn_no=${encodeURIComponent(plate)}` +
     `&partner_code=&mobile_no=${mobile}` +
     `&source=apex&originData=false`;
 
@@ -49,7 +70,7 @@ export default async function handler(req, res) {
         Authorization: 'null',
         Connection: 'keep-alive',
         Referer:
-          `https://apex.renewbuyinsurance.com/motor/?reg_no=${encodeURIComponent(clean)}` +
+          `https://apex.renewbuyinsurance.com/motor/?reg_no=${encodeURIComponent(plate)}` +
           `&mobile_no=${mobile}&vehicle=fourWheeler`,
         'Sec-Fetch-Dest': 'empty',
         'Sec-Fetch-Mode': 'cors',
@@ -60,29 +81,21 @@ export default async function handler(req, res) {
     });
 
     const text = await upstream.text();
-
     let data;
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = { raw: text };
-    }
+    try { data = JSON.parse(text); } catch { data = { raw: text }; }
 
-    // stamp it
-    const stamped = {
+    return res.status(upstream.status).json({
       _made_by: 'DZ HACKER',
-      _requested_regn: clean,
+      _requested_regn: plate,
       _mobile_used: mobile,
       _upstream_status: upstream.status,
       _timestamp: new Date().toISOString(),
       data,
-    };
-
-    res.status(upstream.status).json(stamped);
+    });
   } catch (err) {
-    res.status(502).json({
+    return res.status(502).json({
       _made_by: 'DZ HACKER',
-      _requested_regn: clean,
+      _requested_regn: plate,
       _mobile_used: mobile,
       _error: err.message || 'upstream failed',
     });
