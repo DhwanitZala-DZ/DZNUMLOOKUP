@@ -2,10 +2,7 @@
 // Vaahan lookup — routed through Cloudflare Worker relay
 // Made by DZ HACKER
 
-// Cloudflare Worker relay (yours, from api.php _dzr())
 const WORKER_BASE = 'https://token.rajveeguest.workers.dev';
-
-// Upstream target — RenewBuy Vaahan API
 const TARGET = 'https://apex.renewbuyinsurance.com/api/v1/vaahan/registration_number/';
 
 const COOKIES =
@@ -17,17 +14,13 @@ const COOKIES =
 const RTO_STATES = ['GJ','MH','DL','KA','TN','UP','RJ','MP','WB','AP','TS','KL','HR','PB','BR','OR','AS','JH','CG','UK'];
 const LETTERS    = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
-/* ---------- helpers ---------- */
-
-// fake 10-digit number, never starts with 6-9
 function fakeMobile() {
-  const first = Math.floor(Math.random() * 6); // 0..5
+  const first = Math.floor(Math.random() * 6);
   let rest = '';
   for (let i = 0; i < 9; i++) rest += Math.floor(Math.random() * 10);
   return `${first}${rest}`;
 }
 
-// random plate that is never equal to the one being queried
 function fakePlate(avoid) {
   for (let i = 0; i < 20; i++) {
     const st   = RTO_STATES[Math.floor(Math.random() * RTO_STATES.length)];
@@ -42,61 +35,37 @@ function fakePlate(avoid) {
 }
 
 function cleanPlate(input) {
-  return String(input || '')
-    .replace(/[^a-zA-Z0-9]/g, '')
-    .toUpperCase();
+  return String(input || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
 }
 
 const PLATE_RE = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/;
 
-// handle /veh?GJ01KP8982, /veh?regn_no=..., /veh?regn=..., etc.
 function extractPlate(query) {
   if (!query || typeof query !== 'object') return '';
-
   if (query.regn_no) return query.regn_no;
   if (query.regn)    return query.regn;
-
   const keys   = Object.keys(query);
   const values = Object.values(query);
-
-  for (const k of keys) {
-    const c = cleanPlate(k);
-    if (PLATE_RE.test(c)) return c;
-  }
-  for (const v of values) {
-    const c = cleanPlate(v);
-    if (PLATE_RE.test(c)) return c;
-  }
-  for (const k of keys) {
-    const c = cleanPlate(k);
-    if (c.length >= 6) return c;
-  }
-  for (const v of values) {
-    const c = cleanPlate(v);
-    if (c.length >= 6) return c;
-  }
+  for (const k of keys)   { const c = cleanPlate(k); if (PLATE_RE.test(c)) return c; }
+  for (const v of values) { const c = cleanPlate(v); if (PLATE_RE.test(c)) return c; }
+  for (const k of keys)   { const c = cleanPlate(k); if (c.length >= 6) return c; }
+  for (const v of values) { const c = cleanPlate(v); if (c.length >= 6) return c; }
   return '';
 }
 
-// route the target through the worker.
-// Every header in headersOverride is ALSO encoded as an h_* query param,
-// so the worker can re-attach it even if the calling runtime strips it.
-function viaWorker(targetUrl, headersOverride) {
+// ONLY the headers proven to work via curl. Adding Connection / Sec-Fetch-*
+// / Pragma / Cache-Control breaks CF Workers' header forwarding to upstream.
+function viaWorker(targetUrl, headers) {
   const base = WORKER_BASE.replace(/\/+$/, '');
   const params = new URLSearchParams();
   params.set('url', targetUrl);
-
-  if (headersOverride && typeof headersOverride === 'object') {
-    for (const [k, v] of Object.entries(headersOverride)) {
-      if (v === undefined || v === null || v === '') continue;
-      params.set(`h_${k}`, String(v));
-    }
+  for (const [k, v] of Object.entries(headers)) {
+    if (v === undefined || v === null || v === '') continue;
+    params.set(`h_${k}`, String(v));
   }
-
   return `${base}/?${params.toString()}`;
 }
 
-// retry on 403/429
 async function fetchWithRetry(url, opts, tries = 3) {
   let last;
   for (let i = 0; i < tries; i++) {
@@ -106,8 +75,6 @@ async function fetchWithRetry(url, opts, tries = 3) {
   }
   return last;
 }
-
-/* ---------- handler ---------- */
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -136,35 +103,28 @@ export default async function handler(req, res) {
     `&partner_code=&mobile_no=${mobile}` +
     `&source=apex&originData=false`;
 
-  // the complete set of headers RenewBuy's WAF expects.
-  // every one of these is also mirrored into h_* query params below.
+  // exactly the 7 headers proven to work by curl. nothing else.
   const forwardedHeaders = {
     'User-Agent':
       'Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0',
-    'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.5',
-    'Accept-Encoding': 'gzip, deflate, br, zstd',
-    'Authorization': 'null',
-    'Connection': 'keep-alive',
+    'Accept':           'application/json, text/plain, */*',
+    'Accept-Language':  'en-US,en;q=0.5',
+    'Accept-Encoding':  'gzip, deflate, br, zstd',
+    'Authorization':    'null',
     'Referer':
       `https://apex.renewbuyinsurance.com/motor/?reg_no=${refererPlate}` +
       `&mobile_no=9999999999&vehicle=fourWheeler`,
-    'Cookie': COOKIES,
-    'Sec-Fetch-Dest': 'empty',
-    'Sec-Fetch-Mode': 'cors',
-    'Sec-Fetch-Site': 'same-origin',
-    'Pragma': 'no-cache',
-    'Cache-Control': 'no-cache',
-    'TE': 'trailers',
+    'Cookie':           COOKIES,
+    'TE':               'trailers',
   };
 
-  // URL carries every header as h_* param so nothing gets stripped in transit
   const relayUrl = viaWorker(target, forwardedHeaders);
 
-  // the relay call itself carries the same real headers too — belt and suspenders
+  // relay call carries just the headers the worker itself needs.
+  // everything critical rides in the URL as h_* params anyway.
   const opts = {
     method: 'GET',
-    headers: forwardedHeaders,
+    headers: { 'User-Agent': forwardedHeaders['User-Agent'] },
   };
 
   try {
