@@ -19,6 +19,44 @@ function cleanPlate(input) {
     .toUpperCase();
 }
 
+// Indian plate shape: 2 letters + 1-2 digits + 0-3 letters + 4 digits
+// matches: GJ01KP8982, GJ1KP8982, MH12AB1234, DL8CAF5030
+const PLATE_RE = /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{4}$/;
+
+// pull the plate out of whatever shape the query is in
+function extractPlate(query) {
+  if (!query || typeof query !== 'object') return '';
+
+  // named params first
+  if (query.regn_no) return query.regn_no;
+  if (query.regn) return query.regn;
+
+  // bare key case: /veh?GJ01KP8982  → { "GJ01KP8982": "" }
+  const keys = Object.keys(query);
+  const values = Object.values(query);
+
+  for (const k of keys) {
+    const cleaned = cleanPlate(k);
+    if (PLATE_RE.test(cleaned)) return cleaned;
+  }
+  for (const v of values) {
+    const cleaned = cleanPlate(v);
+    if (PLATE_RE.test(cleaned)) return cleaned;
+  }
+
+  // fallback: anything >=6 alnum so we don't hard-fail weird plates
+  for (const k of keys) {
+    const cleaned = cleanPlate(k);
+    if (cleaned.length >= 6) return cleaned;
+  }
+  for (const v of values) {
+    const cleaned = cleanPlate(v);
+    if (cleaned.length >= 6) return cleaned;
+  }
+
+  return '';
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
@@ -27,21 +65,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end();
 
-  // grab the first query value, whatever its key is
-  // supports: /veh?GJ01KP8982, /veh?regn_no=GJ01KP8982, /veh?regn=GJ01KP8982
-  const rawQuery =
-    req.query.regn_no ||
-    req.query.regn ||
-    req.query.regn_no === '' ? req.query.regn_no :
-    Object.keys(req.query)[0];
-
-  const plateCandidate =
-    req.query.regn_no ||
-    req.query.regn ||
-    Object.values(req.query)[0] ||
-    '';
-
-  const plate = cleanPlate(plateCandidate);
+  const plate = cleanPlate(extractPlate(req.query));
 
   if (!plate || plate.length < 6) {
     return res.status(400).json({
