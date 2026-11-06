@@ -2,6 +2,7 @@
   "version": 2,
   "rewrites": [
     { "source": "/num", "destination": "/api/num" },
+    { "source": "/tg", "destination": "/api/tg" },
     { "source": "/veh", "destination": "/api/veh" }
   ],
   "headers": [
