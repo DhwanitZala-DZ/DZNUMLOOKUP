@@ -3,62 +3,93 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#000000">
 <title>DZ//OSINT — Terminal</title>
 <style>
   :root {
-    --bg: #050805;
-    --bg-panel: #0a0f0a;
-    --bg-hover: #0f1a0f;
-    --fg: #b8f5b8;
-    --fg-dim: #4a7a4a;
-    --fg-bright: #d8ffd8;
-    --green: #00ff41;
-    --green-glow: rgba(0, 255, 65, 0.35);
-    --amber: #ffb000;
-    --red: #ff3355;
-    --cyan: #00d9ff;
-    --border: rgba(0, 255, 65, 0.18);
-    --border-bright: rgba(0, 255, 65, 0.45);
-    --mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', 'Cascadia Code', 'Consolas', 'Courier New', monospace;
+    --black: #000000;
+    --panel: #080b08;
+    --card: #0d120d;
+    --card-hover: #121a12;
+    --border: rgba(0, 255, 136, 0.18);
+    --border-hi: rgba(0, 255, 136, 0.55);
+    --text: #ffffff;
+    --text-2: #c8d4c8;
+    --text-3: #7a8c7a;
+    --green: #00ff88;
+    --green-dim: rgba(0, 255, 136, 0.08);
+    --cyan: #00e5ff;
+    --amber: #ffb300;
+    --red: #ff3366;
+    --purple: #b57bff;
+    --mono: 'JetBrains Mono','Fira Code','SF Mono','Cascadia Code',Consolas,'Courier New',monospace;
   }
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  html, body {
-    background: var(--bg);
-    color: var(--fg);
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--black);
+    color: var(--text);
     font-family: var(--mono);
-    font-size: 13px;
-    line-height: 1.55;
-    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100dvh;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
   }
 
-  /* subtle radial vignette */
-  body::before {
-    content: '';
+  /* animated grid background */
+  .bg-grid {
     position: fixed;
     inset: 0;
-    background: radial-gradient(circle at 50% 0%, rgba(0, 255, 65, 0.06), transparent 60%);
+    background-image:
+      linear-gradient(rgba(0, 255, 136, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 255, 136, 0.045) 1px, transparent 1px);
+    background-size: 48px 48px;
+    animation: gridScroll 30s linear infinite;
     pointer-events: none;
     z-index: 0;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  }
+  @keyframes gridScroll {
+    from { background-position: 0 0; }
+    to { background-position: 48px 48px; }
   }
 
-  /* scanlines */
+  .bg-glow {
+    position: fixed;
+    top: -200px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 900px;
+    height: 600px;
+    background: radial-gradient(ellipse, rgba(0, 255, 136, 0.13), transparent 70%);
+    filter: blur(60px);
+    pointer-events: none;
+    z-index: 0;
+    animation: glowPulse 6s ease-in-out infinite;
+  }
+  @keyframes glowPulse {
+    0%, 100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
+    50% { opacity: 1; transform: translateX(-50%) scale(1.08); }
+  }
+
   .scanlines {
     position: fixed;
     inset: 0;
     background: repeating-linear-gradient(
       0deg,
-      rgba(0, 0, 0, 0.15) 0px,
-      rgba(0, 0, 0, 0.15) 1px,
+      rgba(0, 0, 0, 0.22) 0px,
+      rgba(0, 0, 0, 0.22) 1px,
       transparent 1px,
       transparent 3px
     );
     pointer-events: none;
-    z-index: 9999;
-    opacity: 0.4;
-    mix-blend-mode: multiply;
+    z-index: 9998;
+    opacity: 0.5;
   }
 
   /* ── header ─────────────────────────────────── */
@@ -66,46 +97,55 @@
     position: sticky;
     top: 0;
     z-index: 100;
-    background: rgba(5, 8, 5, 0.92);
-    backdrop-filter: blur(8px);
+    background: rgba(0, 0, 0, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border-bottom: 1px solid var(--border);
-    padding: 12px 20px;
+    padding: 12px 24px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 18px;
     flex-wrap: wrap;
   }
 
   .logo {
-    font-size: 15px;
-    font-weight: 700;
+    font-size: 17px;
+    font-weight: 800;
     color: var(--green);
-    text-shadow: 0 0 8px var(--green-glow);
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 14px rgba(0, 255, 136, 0.6);
     user-select: none;
   }
-  .logo .slash { color: var(--fg-dim); margin: 0 2px; }
+  .logo .slash { color: var(--text-3); margin: 0 3px; font-weight: 400; }
 
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
   .status-dot {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
     border-radius: 50%;
     background: var(--green);
-    box-shadow: 0 0 8px var(--green-glow);
+    box-shadow: 0 0 12px var(--green);
     animation: pulse 2s ease-in-out infinite;
   }
   @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
   }
 
-  .status-pill {
-    font-size: 11px;
-    color: var(--fg-dim);
-    letter-spacing: 0.1em;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  .clock {
+    font-size: 12px;
+    color: var(--green);
+    letter-spacing: 0.08em;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 6px rgba(0, 255, 136, 0.4);
   }
 
   .header-spacer { flex: 1; }
@@ -113,210 +153,272 @@
   .hdr-btn {
     background: transparent;
     border: 1px solid var(--border);
-    color: var(--fg-dim);
+    color: var(--text-2);
     font-family: var(--mono);
     font-size: 11px;
-    padding: 5px 10px;
+    font-weight: 600;
+    padding: 6px 12px;
     cursor: pointer;
-    letter-spacing: 0.08em;
-    transition: all 0.15s;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    transition: all 0.18s ease;
   }
   .hdr-btn:hover {
     border-color: var(--green);
     color: var(--green);
-    box-shadow: 0 0 8px var(--green-glow);
+    box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
+    transform: translateY(-1px);
   }
 
-  /* ── layout ──────────────────────────────────── */
+  /* ── main container ─────────────────────────── */
   main {
     position: relative;
     z-index: 1;
-    max-width: 1180px;
+    max-width: 1280px;
     margin: 0 auto;
-    padding: 24px 20px 80px;
+    padding: 28px 24px 100px;
+    animation: fadeIn 0.4s ease-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
-  /* ── type tabs ───────────────────────────────── */
-  .type-tabs {
+  /* ── type tabs ──────────────────────────────── */
+  .tabs {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 8px;
-    margin-bottom: 16px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 18px;
   }
-  .type-tab {
-    background: var(--bg-panel);
+  .tab {
+    position: relative;
+    background: var(--panel);
     border: 1px solid var(--border);
-    color: var(--fg-dim);
-    padding: 10px 12px;
+    color: var(--text-2);
+    padding: 14px 16px;
     cursor: pointer;
     font-family: var(--mono);
-    font-size: 11px;
     text-align: left;
-    transition: all 0.15s;
-    position: relative;
+    transition: all 0.2s ease;
     overflow: hidden;
+    min-width: 0;
   }
-  .type-tab .tt-label {
-    display: block;
-    font-weight: 700;
-    font-size: 13px;
-    letter-spacing: 0.1em;
-    color: var(--fg);
-    margin-bottom: 2px;
-  }
-  .type-tab .tt-desc {
-    display: block;
-    font-size: 10px;
-    color: var(--fg-dim);
-    letter-spacing: 0.02em;
-  }
-  .type-tab:hover {
-    border-color: var(--border-bright);
-    background: var(--bg-hover);
-  }
-  .type-tab.active {
-    border-color: var(--green);
-    background: rgba(0, 255, 65, 0.06);
-    box-shadow: inset 0 0 20px rgba(0, 255, 65, 0.08), 0 0 12px rgba(0, 255, 65, 0.12);
-  }
-  .type-tab.active .tt-label { color: var(--green); text-shadow: 0 0 6px var(--green-glow); }
-  .type-tab.active::before {
+  .tab::before {
     content: '';
     position: absolute;
     left: 0; top: 0; bottom: 0;
-    width: 2px;
-    background: var(--green);
-    box-shadow: 0 0 8px var(--green);
+    width: 3px;
+    background: var(--text-3);
+    transition: all 0.2s ease;
   }
+  .tab[data-type="num"]::before    { background: var(--green); }
+  .tab[data-type="tg"]::before     { background: var(--cyan); }
+  .tab[data-type="veh"]::before    { background: var(--amber); }
+  .tab[data-type="aadhar"]::before { background: var(--purple); }
 
-  /* ── input row ───────────────────────────────── */
+  .tab .tt-label {
+    display: block;
+    font-weight: 800;
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    color: var(--text);
+    margin-bottom: 3px;
+    transition: color 0.2s;
+  }
+  .tab .tt-desc {
+    display: block;
+    font-size: 10px;
+    color: var(--text-3);
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .tab:hover {
+    background: var(--card);
+    border-color: var(--border-hi);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+  }
+  .tab.active {
+    border-color: var(--green);
+    background: var(--card);
+    box-shadow: 0 0 0 1px var(--green), 0 0 24px rgba(0, 255, 136, 0.15);
+  }
+  .tab.active .tt-label { color: var(--green); }
+  .tab.active::before { width: 100%; opacity: 0.08; }
+
+  /* ── input row ──────────────────────────────── */
   .input-row {
     display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
+    gap: 10px;
+    margin-bottom: 22px;
   }
   .input-wrap {
     flex: 1;
     display: flex;
     align-items: center;
-    background: var(--bg-panel);
+    background: var(--panel);
     border: 1px solid var(--border);
-    padding: 0 12px;
-    transition: border-color 0.15s;
+    padding: 0 16px;
+    transition: all 0.2s ease;
+    min-width: 0;
   }
   .input-wrap:focus-within {
     border-color: var(--green);
-    box-shadow: 0 0 12px var(--green-glow);
+    box-shadow: 0 0 0 1px var(--green), 0 0 24px rgba(0, 255, 136, 0.2);
   }
-  .input-prefix {
+  .prefix {
     color: var(--green);
-    margin-right: 8px;
-    font-weight: 700;
+    margin-right: 10px;
+    font-weight: 800;
+    font-size: 15px;
     user-select: none;
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
   }
   #queryInput {
     flex: 1;
     background: transparent;
     border: none;
     outline: none;
-    color: var(--fg-bright);
+    color: var(--text);
     font-family: var(--mono);
-    font-size: 14px;
-    padding: 12px 0;
+    font-size: 15px;
+    font-weight: 500;
+    padding: 15px 0;
     letter-spacing: 0.02em;
+    min-width: 0;
   }
-  #queryInput::placeholder { color: var(--fg-dim); opacity: 0.6; }
+  #queryInput::placeholder { color: var(--text-3); opacity: 0.7; }
 
   .lookup-btn {
     background: var(--green);
-    color: #050805;
+    color: #000;
     border: none;
     font-family: var(--mono);
-    font-weight: 700;
-    font-size: 12px;
-    letter-spacing: 0.1em;
-    padding: 0 22px;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    padding: 0 28px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all 0.2s ease;
     position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
   }
   .lookup-btn:hover:not(:disabled) {
-    box-shadow: 0 0 20px var(--green-glow);
-    transform: translateY(-1px);
+    box-shadow: 0 0 28px rgba(0, 255, 136, 0.6);
+    transform: translateY(-2px);
   }
-  .lookup-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
+  .lookup-btn:active:not(:disabled) { transform: translateY(0); }
+  .lookup-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── result panel ───────────────────────────── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    position: relative;
+    min-height: 140px;
+    animation: panelIn 0.3s ease-out;
+    min-width: 0;
+  }
+  @keyframes panelIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 
-  /* ── result panel ────────────────────────────── */
-  .result-panel {
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    min-height: 120px;
-    position: relative;
-  }
   .panel-header {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
+    gap: 10px;
+    padding: 14px 18px;
     border-bottom: 1px solid var(--border);
-    background: rgba(0, 255, 65, 0.03);
+    background: rgba(0, 255, 136, 0.025);
     flex-wrap: wrap;
   }
   .panel-title {
-    font-size: 11px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 800;
     color: var(--green);
-    letter-spacing: 0.15em;
-    text-shadow: 0 0 6px var(--green-glow);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.5);
   }
-  .meta-chip {
+
+  .chip {
     font-size: 10px;
-    padding: 3px 8px;
+    font-weight: 600;
+    padding: 4px 10px;
     border: 1px solid var(--border);
-    color: var(--fg-dim);
-    letter-spacing: 0.05em;
+    color: var(--text-2);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
     white-space: nowrap;
+    transition: all 0.2s;
   }
-  .meta-chip.ok { border-color: var(--green); color: var(--green); }
-  .meta-chip.warn { border-color: var(--amber); color: var(--amber); }
-  .meta-chip.err { border-color: var(--red); color: var(--red); }
-  .meta-chip.cache { border-color: var(--cyan); color: var(--cyan); }
-
-  .panel-body {
-    padding: 16px;
+  .chip.ok { border-color: var(--green); color: var(--green); }
+  .chip.warn { border-color: var(--amber); color: var(--amber); }
+  .chip.err { border-color: var(--red); color: var(--red); }
+  .chip.cache {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    animation: cacheGlow 2s ease-in-out infinite;
+  }
+  @keyframes cacheGlow {
+    0%, 100% { box-shadow: 0 0 0 rgba(0, 229, 255, 0); }
+    50% { box-shadow: 0 0 12px rgba(0, 229, 255, 0.35); }
   }
 
-  /* empty state */
-  .empty-state {
-    padding: 48px 20px;
+  .panel-body { padding: 20px; min-width: 0; }
+
+  /* ── empty/loading/error ───────────────────── */
+  .empty {
+    padding: 60px 20px;
     text-align: center;
-    color: var(--fg-dim);
-    font-size: 12px;
-    letter-spacing: 0.05em;
+    color: var(--text-3);
+    font-size: 13px;
+    letter-spacing: 0.04em;
   }
-  .empty-state .big {
-    font-size: 28px;
-    margin-bottom: 12px;
-    color: var(--border-bright);
-    opacity: 0.4;
+  .empty .glyph {
+    font-size: 42px;
+    color: var(--border-hi);
+    margin-bottom: 16px;
+    display: block;
+    animation: float 3s ease-in-out infinite;
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
   }
 
-  /* loading */
-  .loading-state {
-    padding: 48px 20px;
+  .loading {
+    padding: 60px 20px;
     text-align: center;
+  }
+  .loading-text {
     color: var(--green);
-    font-size: 12px;
-    letter-spacing: 0.1em;
+    font-size: 13px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px rgba(0, 255, 136, 0.5);
+  }
+  .loading-text::after {
+    content: '...';
+    animation: dots 1.4s steps(4) infinite;
+  }
+  @keyframes dots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75%, 100% { content: '...'; }
   }
   .loading-bar {
-    width: 240px;
-    height: 2px;
-    background: var(--border);
-    margin: 16px auto 0;
+    width: 280px;
+    max-width: 80%;
+    height: 3px;
+    background: rgba(0, 255, 136, 0.12);
+    margin: 0 auto;
     position: relative;
     overflow: hidden;
   }
@@ -324,597 +426,822 @@
     content: '';
     position: absolute;
     inset: 0;
-    width: 40%;
-    background: var(--green);
-    box-shadow: 0 0 12px var(--green);
-    animation: scan 1.2s ease-in-out infinite;
+    width: 35%;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    animation: scan 1.4s ease-in-out infinite;
   }
   @keyframes scan {
     0% { transform: translateX(-100%); }
-    100% { transform: translateX(350%); }
+    100% { transform: translateX(400%); }
   }
 
-  /* error */
   .error-box {
-    background: rgba(255, 51, 85, 0.06);
-    border: 1px solid rgba(255, 51, 85, 0.4);
-    padding: 14px 16px;
-    color: #ff8899;
-    font-size: 12px;
-    line-height: 1.6;
+    background: rgba(255, 51, 102, 0.06);
+    border: 1px solid rgba(255, 51, 102, 0.45);
+    border-left-width: 3px;
+    padding: 16px 18px;
+    color: #ffc0cc;
+    font-size: 13px;
+    line-height: 1.7;
+    animation: shake 0.4s ease-out;
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
   }
   .error-box .err-title {
-    font-weight: 700;
+    font-weight: 800;
     color: var(--red);
-    letter-spacing: 0.1em;
-    font-size: 11px;
-    margin-bottom: 6px;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
   }
 
-  /* consensus banner */
+  /* ── consensus banner ───────────────────────── */
   .consensus {
-    background: rgba(0, 217, 255, 0.06);
-    border: 1px solid rgba(0, 217, 255, 0.35);
-    padding: 12px 14px;
-    margin-bottom: 14px;
+    background: linear-gradient(135deg, rgba(0, 229, 255, 0.08), rgba(0, 229, 255, 0.02));
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    padding: 18px 22px;
+    margin-bottom: 18px;
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 22px;
     flex-wrap: wrap;
+    position: relative;
+    overflow: hidden;
   }
-  .consensus .c-label {
+  .consensus::before {
+    content: '';
+    position: absolute;
+    top: 0; left: -100%;
+    width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(0, 229, 255, 0.15), transparent);
+    animation: shimmer 3s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0% { left: -100%; }
+    50%, 100% { left: 100%; }
+  }
+  .c-label {
     font-size: 10px;
     color: var(--cyan);
-    letter-spacing: 0.15em;
-    font-weight: 700;
+    letter-spacing: 0.16em;
+    font-weight: 800;
+    text-transform: uppercase;
+    position: relative;
   }
-  .consensus .c-value {
-    font-size: 16px;
-    color: var(--fg-bright);
-    font-weight: 700;
-    letter-spacing: 0.05em;
+  .c-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: 0.04em;
     cursor: pointer;
+    transition: all 0.2s;
+    text-shadow: 0 0 16px rgba(0, 229, 255, 0.5);
+    position: relative;
   }
-  .consensus .c-value:hover { color: var(--cyan); text-shadow: 0 0 8px rgba(0, 217, 255, 0.5); }
-  .consensus .c-votes {
-    font-size: 10px;
-    color: var(--fg-dim);
+  .c-value:hover {
+    color: var(--cyan);
+    text-shadow: 0 0 24px rgba(0, 229, 255, 0.9);
+  }
+  .c-votes {
+    font-size: 11px;
+    color: var(--text-2);
+    letter-spacing: 0.06em;
     margin-left: auto;
+    position: relative;
+  }
+  .c-unanimous {
+    color: var(--green);
+    font-weight: 800;
   }
 
-  /* record card */
+  /* ── record card ────────────────────────────── */
+  .records { display: flex; flex-direction: column; gap: 14px; }
+
   .record {
+    background: var(--card);
     border: 1px solid var(--border);
-    margin-bottom: 12px;
-    background: rgba(0, 0, 0, 0.3);
+    position: relative;
+    min-width: 0;
+    overflow: hidden;
+    animation: recordIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+    transition: all 0.2s ease;
   }
-  .record:last-child { margin-bottom: 0; }
+  .record:hover {
+    border-color: var(--border-hi);
+    box-shadow: 0 4px 24px rgba(0, 255, 136, 0.08);
+  }
+  @keyframes recordIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   .record-head {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 12px;
+    gap: 12px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
-    background: rgba(0, 255, 65, 0.03);
+    background: rgba(0, 255, 136, 0.03);
     flex-wrap: wrap;
   }
-  .record-badge {
+  .badge {
     font-size: 10px;
-    padding: 2px 8px;
+    font-weight: 800;
+    padding: 3px 10px;
     background: var(--green);
-    color: #050805;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    color: #000;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
   }
-  .record-source {
+  .source-badge {
     font-size: 10px;
+    font-weight: 700;
     color: var(--cyan);
     letter-spacing: 0.08em;
-    border: 1px solid rgba(0, 217, 255, 0.35);
-    padding: 2px 8px;
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    padding: 3px 10px;
+    text-transform: uppercase;
   }
-  .record-copy {
+  .copy-btn {
     margin-left: auto;
     background: transparent;
     border: 1px solid var(--border);
-    color: var(--fg-dim);
+    color: var(--text-2);
     font-family: var(--mono);
     font-size: 10px;
-    padding: 3px 10px;
+    font-weight: 600;
+    padding: 4px 12px;
     cursor: pointer;
-    letter-spacing: 0.06em;
-    transition: all 0.15s;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: all 0.18s ease;
   }
-  .record-copy:hover { border-color: var(--green); color: var(--green); }
+  .copy-btn:hover {
+    border-color: var(--green);
+    color: var(--green);
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.25);
+  }
+  .copy-btn.copied {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(0, 255, 136, 0.12);
+  }
 
+  /* ── record fields grid ─────────────────────── */
   .fields {
     display: grid;
-    grid-template-columns: minmax(110px, max-content) 1fr;
-    gap: 0;
+    grid-template-columns: minmax(130px, 180px) minmax(0, 1fr);
   }
-  .field {
-    display: contents;
-  }
-  .field-key {
-    padding: 8px 12px;
-    color: var(--fg-dim);
-    font-size: 11px;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid rgba(0, 255, 65, 0.06);
-    border-right: 1px solid rgba(0, 255, 65, 0.06);
-    text-transform: uppercase;
-    word-break: break-all;
-  }
-  .field-val {
-    padding: 8px 12px;
-    color: var(--fg-bright);
-    font-size: 12px;
-    border-bottom: 1px solid rgba(0, 255, 65, 0.06);
-    word-break: break-all;
-    cursor: pointer;
-    transition: background 0.12s;
-    position: relative;
-  }
-  .field-val:hover {
-    background: rgba(0, 255, 65, 0.05);
-  }
-  .field-val:hover::after {
-    content: '⊕ copy';
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 9px;
-    color: var(--green);
-    opacity: 0.7;
-    letter-spacing: 0.05em;
-  }
-  .field.priority .field-key { color: var(--green); }
-  .field.priority .field-val {
-    color: var(--fg-bright);
-    font-weight: 700;
-    font-size: 14px;
-    text-shadow: 0 0 6px rgba(0, 255, 65, 0.25);
-  }
-  .field-val.arr {
-    color: var(--fg-dim);
-    font-style: italic;
-    cursor: default;
-  }
-  .field-val.arr:hover { background: transparent; }
-  .field-val.arr:hover::after { content: ''; }
+  .field { display: contents; }
 
-  /* raw json */
-  .raw-section {
-    margin-top: 14px;
-    border: 1px solid var(--border);
-    background: rgba(0, 0, 0, 0.3);
-  }
-  .raw-head {
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    cursor: pointer;
-    user-select: none;
-    border-bottom: 1px solid var(--border);
-    background: rgba(0, 255, 65, 0.03);
-  }
-  .raw-head:hover { background: rgba(0, 255, 65, 0.06); }
-  .raw-title {
-    font-size: 11px;
-    color: var(--green);
-    letter-spacing: 0.12em;
-    font-weight: 700;
-  }
-  .raw-toggle {
-    margin-left: auto;
+  .field-key {
+    padding: 12px 16px;
+    background: rgba(0, 255, 136, 0.02);
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid rgba(0, 255, 136, 0.08);
     font-size: 10px;
-    color: var(--fg-dim);
-    letter-spacing: 0.05em;
-  }
-  .raw-body {
-    display: none;
-    padding: 12px 14px;
-    max-height: 480px;
-    overflow: auto;
-  }
-  .raw-section.open .raw-body { display: block; }
-  .raw-body pre {
-    font-family: var(--mono);
-    font-size: 11px;
-    line-height: 1.5;
-    color: var(--fg);
-    white-space: pre-wrap;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    display: flex;
+    align-items: flex-start;
+    padding-top: 14px;
+    min-width: 0;
     word-break: break-word;
   }
-  .j-key { color: var(--cyan); }
-  .j-str { color: var(--green); }
-  .j-num { color: var(--amber); }
-  .j-bool { color: #ff79c6; }
-  .j-null { color: var(--fg-dim); font-style: italic; }
 
-  /* broker strip */
-  .broker-strip {
-    margin-top: 12px;
-    padding: 10px 12px;
-    border: 1px dashed var(--border);
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 18px;
-    font-size: 10px;
-    color: var(--fg-dim);
-    letter-spacing: 0.04em;
-  }
-  .broker-strip .bk-item { white-space: nowrap; }
-  .broker-strip .bk-item b { color: var(--fg); font-weight: 400; }
-
-  /* ── history ─────────────────────────────────── */
-  .history-section {
-    margin-top: 32px;
-    border-top: 1px solid var(--border);
-    padding-top: 20px;
-  }
-  .section-title {
-    font-size: 11px;
-    color: var(--green);
-    letter-spacing: 0.15em;
-    font-weight: 700;
-    margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .section-title::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-  .history-list { display: flex; flex-direction: column; gap: 4px; }
-  .history-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    background: var(--bg-panel);
+  .field-val {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(0, 255, 136, 0.08);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    min-width: 0;
+    position: relative;
     cursor: pointer;
-    transition: all 0.12s;
+    transition: background 0.15s;
+    padding-right: 40px;
+  }
+  .field-val:hover { background: rgba(0, 255, 136, 0.05); }
+  .field-val::after {
+    content: '⧉';
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    color: var(--text-3);
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.15s;
+    pointer-events: none;
+  }
+  .field-val:hover::after {
+    opacity: 1;
+    color: var(--green);
+    text-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+  }
+  .field-val.copied {
+    background: rgba(0, 255, 136, 0.15);
+  }
+
+  .field.priority .field-key {
+    color: var(--green);
+    font-weight: 800;
+  }
+  .field.priority .field-val {
+    color: #fff;
+    font-size: 17px;
+    font-weight: 700;
+    text-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
+  }
+
+  .field-val.complex {
+    cursor: default;
+    color: var(--text-2);
+    font-size: 13px;
+  }
+  .field-val.complex::after { content: none; }
+  .field-val.complex:hover { background: transparent; }
+
+  .arr-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 4px 0;
+  }
+  .arr-list li {
+    padding-left: 22px;
+    position: relative;
+    color: var(--text-2);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  .arr-list li::before {
+    content: '▸';
+    position: absolute;
+    left: 4px;
+    color: var(--green);
     font-size: 11px;
   }
-  .history-item:hover {
-    border-color: var(--border-bright);
-    background: var(--bg-hover);
+  .arr-list li .arr-idx {
+    color: var(--text-3);
+    font-size: 10px;
+    margin-right: 6px;
   }
-  .hi-type {
-    color: var(--green);
+
+  /* ── stats strip ────────────────────────────── */
+  .stats-strip {
+    margin-top: 18px;
+    padding: 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 14px;
+  }
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  .stat-label {
+    font-size: 9px;
+    color: var(--text-3);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    min-width: 55px;
-  }
-  .hi-query {
-    color: var(--fg-bright);
-    flex: 1;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .hi-time {
-    color: var(--fg-dim);
-    font-size: 10px;
-    white-space: nowrap;
+  .stat-value {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text);
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+    line-height: 1.2;
   }
-  .hi-status {
-    font-size: 9px;
-    padding: 2px 6px;
-    letter-spacing: 0.05em;
+  .stat.accent .stat-value { color: var(--green); text-shadow: 0 0 12px rgba(0, 255, 136, 0.4); }
+  .stat.warn .stat-value { color: var(--amber); }
+  .stat.cyan .stat-value { color: var(--cyan); text-shadow: 0 0 12px rgba(0, 229, 255, 0.4); }
+
+  .progress {
+    width: 100%;
+    height: 4px;
+    background: rgba(0, 255, 136, 0.1);
+    margin-top: 6px;
+    position: relative;
+    overflow: hidden;
   }
-  .hi-status.ok { color: var(--green); border: 1px solid rgba(0, 255, 65, 0.3); }
-  .hi-status.err { color: var(--red); border: 1px solid rgba(255, 51, 85, 0.3); }
-  .history-empty {
-    color: var(--fg-dim);
-    font-size: 11px;
-    padding: 16px;
-    text-align: center;
-    border: 1px dashed var(--border);
+  .progress-bar {
+    height: 100%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    width: 0;
   }
 
-  /* ── toast ───────────────────────────────────── */
-  #toastContainer {
+  /* ── raw json ──────────────────────────────── */
+  .raw {
+    margin-top: 18px;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+  .raw-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.15s;
+    flex-wrap: wrap;
+  }
+  .raw-head:hover { background: rgba(0, 255, 136, 0.04); }
+  .raw-title {
+    font-size: 11px;
+    color: var(--green);
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+  .raw-toggle {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-3);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .raw-body {
+    display: none;
+    max-height: 500px;
+    overflow: auto;
+    border-top: 1px solid var(--border);
+  }
+  .raw.open .raw-body { display: block; }
+  .raw-body pre {
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-2);
+    padding: 16px 18px;
+    white-space: pre;
+    min-width: 100%;
+  }
+  .j-key { color: var(--cyan); }
+  .j-str { color: var(--green); }
+  .j-num { color: var(--amber); }
+  .j-bool { color: var(--purple); }
+  .j-null { color: var(--text-3); font-style: italic; }
+
+  /* ── history ───────────────────────────────── */
+  .history-sec {
+    margin-top: 40px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+  .sec-title {
+    font-size: 12px;
+    color: var(--green);
+    letter-spacing: 0.16em;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .sec-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--border), transparent);
+  }
+  .sec-title .count {
+    font-size: 10px;
+    color: var(--text-3);
+    font-weight: 600;
+  }
+
+  .history-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .hist-item {
+    display: grid;
+    grid-template-columns: 70px minmax(0, 1fr) auto 60px auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 16px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s ease;
+    animation: histIn 0.3s ease-out both;
+    min-width: 0;
+  }
+  @keyframes histIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .hist-item:hover {
+    border-color: var(--border-hi);
+    background: var(--card);
+    transform: translateX(4px);
+  }
+
+  .hist-type {
+    color: var(--green);
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  .hist-query {
+    color: var(--text);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+  }
+  .hist-query .arrow { color: var(--text-3); margin: 0 6px; }
+  .hist-query .summary { color: var(--cyan); }
+  .hist-status {
+    font-size: 9px;
+    padding: 3px 8px;
+    letter-spacing: 0.08em;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  .hist-status.ok { color: var(--green); border: 1px solid rgba(0, 255, 136, 0.4); }
+  .hist-status.err { color: var(--red); border: 1px solid rgba(255, 51, 102, 0.4); }
+  .hist-time {
+    color: var(--text-3);
+    font-size: 10px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .hist-del {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-3);
+    cursor: pointer;
+    padding: 3px 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    transition: all 0.15s;
+    opacity: 0;
+  }
+  .hist-item:hover .hist-del { opacity: 1; }
+  .hist-del:hover {
+    color: var(--red);
+    border-color: rgba(255, 51, 102, 0.4);
+  }
+
+  .hist-empty {
+    color: var(--text-3);
+    font-size: 12px;
+    padding: 32px 20px;
+    text-align: center;
+    border: 1px dashed var(--border);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── toast ─────────────────────────────────── */
+  #toasts {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    bottom: 24px;
+    right: 24px;
     z-index: 10000;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
     pointer-events: none;
+    max-width: calc(100vw - 48px);
   }
   .toast {
-    background: var(--bg-panel);
+    background: #000;
     border: 1px solid var(--green);
     color: var(--green);
-    padding: 10px 16px;
-    font-size: 11px;
+    padding: 12px 18px;
+    font-size: 12px;
+    font-weight: 600;
     letter-spacing: 0.06em;
-    box-shadow: 0 0 20px var(--green-glow);
-    animation: toastIn 0.2s ease-out;
+    box-shadow: 0 0 24px rgba(0, 255, 136, 0.35), 0 8px 32px rgba(0, 0, 0, 0.8);
+    animation: toastIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     pointer-events: auto;
+    max-width: 360px;
+    overflow-wrap: anywhere;
   }
-  .toast.err { border-color: var(--red); color: var(--red); box-shadow: 0 0 20px rgba(255, 51, 85, 0.3); }
+  .toast.err {
+    border-color: var(--red);
+    color: var(--red);
+    box-shadow: 0 0 24px rgba(255, 51, 102, 0.35), 0 8px 32px rgba(0, 0, 0, 0.8);
+  }
   @keyframes toastIn {
-    from { opacity: 0; transform: translateX(20px); }
-    to { opacity: 1; transform: translateX(0); }
+    from { opacity: 0; transform: translateX(30px) scale(0.95); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
   }
 
-  /* ── scrollbar ───────────────────────────────── */
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track { background: var(--bg); }
+  /* ── scrollbar ─────────────────────────────── */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--black); }
   ::-webkit-scrollbar-thumb {
-    background: var(--border-bright);
-    border-radius: 0;
+    background: rgba(0, 255, 136, 0.3);
+    border: 2px solid var(--black);
   }
   ::-webkit-scrollbar-thumb:hover { background: var(--green); }
 
-  /* ── responsive ──────────────────────────────── */
-  @media (max-width: 720px) {
-    .type-tabs { grid-template-columns: repeat(2, 1fr); }
+  /* ── responsive ───────────────────────────── */
+  @media (max-width: 820px) {
+    main { padding: 20px 14px 80px; }
+    header { padding: 10px 14px; gap: 12px; }
+    .clock { display: none; }
+    .tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 600px) {
+    body { font-size: 13px; }
     .input-row { flex-direction: column; }
-    .lookup-btn { padding: 12px; }
+    .lookup-btn { padding: 14px; }
     .fields { grid-template-columns: 1fr; }
-    .field-key { border-right: none; padding-bottom: 2px; }
-    .field-val { padding-top: 4px; }
+    .field-key {
+      border-right: none;
+      border-bottom: none;
+      padding: 12px 14px 2px;
+    }
+    .field-val {
+      padding: 2px 14px 14px;
+      padding-right: 40px;
+    }
+    .hist-item {
+      grid-template-columns: 55px minmax(0, 1fr) auto;
+      gap: 10px;
+    }
+    .hist-time, .hist-status { display: none; }
+    .c-value { font-size: 20px; }
+    .stat-value { font-size: 16px; }
   }
 </style>
 </head>
 <body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
 <div class="scanlines"></div>
 
 <header>
-  <div class="status-dot"></div>
   <div class="logo">DZ<span class="slash">//</span>OSINT</div>
-  <div class="status-pill">TERMINAL v1.0 · CONNECTED</div>
+  <div class="status">
+    <span class="status-dot"></span>
+    ONLINE
+  </div>
+  <div class="clock" id="clock">--:--:--</div>
   <div class="header-spacer"></div>
-  <button class="hdr-btn" id="btnExportHistory" title="Download all history as JSON">EXPORT</button>
-  <button class="hdr-btn" id="btnClearCache" title="Clear localStorage cache + history">PURGE</button>
+  <button class="hdr-btn" id="btnExport">EXPORT</button>
+  <button class="hdr-btn" id="btnPurge">PURGE</button>
 </header>
 
 <main>
-  <div class="type-tabs" id="typeTabs"></div>
+  <div class="tabs" id="tabs"></div>
 
   <div class="input-row">
     <div class="input-wrap">
-      <span class="input-prefix">&gt;</span>
+      <span class="prefix">&gt;</span>
       <input id="queryInput" type="text" placeholder="enter query..." autocomplete="off" spellcheck="false">
     </div>
     <button class="lookup-btn" id="lookupBtn">LOOKUP</button>
   </div>
 
-  <div class="result-panel" id="resultPanel">
+  <div class="panel" id="panel">
     <div class="panel-header">
       <span class="panel-title">RESULT</span>
-      <span class="meta-chip" id="metaType">—</span>
-      <span class="meta-chip" id="metaQuery">—</span>
-      <span class="meta-chip" id="metaCredits" style="display:none"></span>
-      <span class="meta-chip" id="metaTime" style="display:none"></span>
-      <span class="meta-chip cache" id="metaChecked" style="display:none"></span>
+      <span class="chip" id="chipType">—</span>
+      <span class="chip" id="chipQuery">—</span>
+      <span class="chip ok" id="chipCredits" style="display:none"></span>
+      <span class="chip" id="chipTime" style="display:none"></span>
+      <span class="chip cache" id="chipCache" style="display:none"></span>
     </div>
     <div class="panel-body" id="panelBody">
-      <div class="empty-state">
-        <div class="big">[ ]</div>
-        awaiting input... pick a type, enter a query, hit LOOKUP
+      <div class="empty">
+        <span class="glyph">[ ]</span>
+        awaiting input — pick a type, enter a query, hit LOOKUP
       </div>
     </div>
   </div>
 
-  <div class="history-section">
-    <div class="section-title">RECENT LOOKUPS</div>
-    <div class="history-list" id="historyList">
-      <div class="history-empty">no history yet</div>
+  <section class="history-sec">
+    <div class="sec-title">Recent Lookups <span class="count" id="histCount"></span></div>
+    <div class="history-list" id="histList">
+      <div class="hist-empty">no history yet</div>
     </div>
-  </div>
+  </section>
 </main>
 
-<div id="toastContainer"></div>
+<div id="toasts"></div>
 
 <script>
 (function () {
   'use strict';
 
-  // ── config ────────────────────────────────────────────────
-  const API_BASE = 'https://dz-osint.vercel.app';
+  const API = 'https://dz-osint.vercel.app';
 
   const TYPES = {
-    num:    { label: 'NUM',    desc: 'phone lookup',           ph: '9997774567',  endpoint: '/num',    pattern: /^\d{6,}$/,  upper: false },
-    tg:     { label: 'TG',     desc: 'telegram id → number',   ph: '7871967159',  endpoint: '/tg',     pattern: /^\d{6,}$/,  upper: false },
-    veh:    { label: 'VEH',    desc: 'vehicle → mobile',       ph: 'GJ27AF8582',  endpoint: '/veh',    pattern: /^[A-Z0-9]{6,}$/, upper: true },
-    aadhar: { label: 'AADHAR', desc: 'aadhaar → info',         ph: '862587803506',endpoint: '/aadhar', pattern: /^\d{6,}$/,  upper: false },
+    num:    { label: 'NUM',    desc: 'Phone',    ph: '9997774567',   ep: '/num',    pattern: /^\d{6,}$/,         upper: false, color: 'green' },
+    tg:     { label: 'TG',     desc: 'Telegram', ph: '7871967159',   ep: '/tg',     pattern: /^\d{6,}$/,         upper: false, color: 'cyan' },
+    veh:    { label: 'VEH',    desc: 'Vehicle',  ph: 'GJ27AF8582',   ep: '/veh',    pattern: /^[A-Z0-9]{6,}$/,   upper: true,  color: 'amber' },
+    aadhar: { label: 'AADHAR', desc: 'Aadhaar',  ph: '862587803506', ep: '/aadhar', pattern: /^\d{6,}$/,         upper: false, color: 'purple' },
   };
 
-  const PRIORITY_FIELDS = {
-    num:    ['number', 'name', 'address', 'circle', 'alt'],
+  const PRIORITY = {
+    num:    ['number', 'name', 'circle', 'alt', 'address'],
     tg:     ['number', 'country', 'country_code', 'tg_id'],
     veh:    ['mobile_number', 'vehicle_number', 'source'],
     aadhar: ['name', 'fname', 'num', 'alt', 'circle', 'aadhar', 'address'],
   };
 
-  const CACHE_KEY   = 'dz_osint_cache_v1';
-  const HISTORY_KEY = 'dz_osint_history_v1';
-  const HISTORY_MAX = 50;
+  const CK = 'dz_v2_cache';
+  const HK = 'dz_v2_history';
+  const HMAX = 100;
 
-  // ── state ─────────────────────────────────────────────────
   let currentType = 'num';
   let loading = false;
 
-  // ── dom refs ──────────────────────────────────────────────
-  const $ = (id) => document.getElementById(id);
-  const typeTabsEl   = $('typeTabs');
-  const queryInput   = $('queryInput');
-  const lookupBtn    = $('lookupBtn');
-  const panelBody    = $('panelBody');
-  const metaType     = $('metaType');
-  const metaQuery    = $('metaQuery');
-  const metaCredits  = $('metaCredits');
-  const metaTime     = $('metaTime');
-  const metaChecked  = $('metaChecked');
-  const historyList  = $('historyList');
-  const toastCont    = $('toastContainer');
+  const $ = id => document.getElementById(id);
+  const tabsEl = $('tabs'), inputEl = $('queryInput'), btnEl = $('lookupBtn');
+  const panelBody = $('panelBody'), histList = $('histList'), histCount = $('histCount');
+  const chipType = $('chipType'), chipQuery = $('chipQuery'), chipCredits = $('chipCredits');
+  const chipTime = $('chipTime'), chipCache = $('chipCache');
+  const toastsEl = $('toasts'), clockEl = $('clock');
 
-  // ── utils ─────────────────────────────────────────────────
-  function toast(msg, isErr) {
-    const el = document.createElement('div');
-    el.className = 'toast' + (isErr ? ' err' : '');
-    el.textContent = msg;
-    toastCont.appendChild(el);
-    setTimeout(() => {
-      el.style.transition = 'opacity 0.2s, transform 0.2s';
-      el.style.opacity = '0';
-      el.style.transform = 'translateX(20px)';
-      setTimeout(() => el.remove(), 220);
-    }, 2200);
+  /* ── utils ───────────────────────────────────── */
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  async function copyText(text) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
+  function fmt(ts) {
+    const d = new Date(ts), p = n => String(n).padStart(2,'0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  }
+
+  function ago(ts) {
+    const s = Math.floor((Date.now()-ts)/1000);
+    if (s < 60) return s+'s ago';
+    if (s < 3600) return Math.floor(s/60)+'m ago';
+    if (s < 86400) return Math.floor(s/3600)+'h ago';
+    return Math.floor(s/86400)+'d ago';
+  }
+
+  function toast(msg, err) {
+    const el = document.createElement('div');
+    el.className = 'toast' + (err ? ' err' : '');
+    el.textContent = msg;
+    toastsEl.appendChild(el);
+    setTimeout(() => {
+      el.style.transition = 'opacity 0.25s, transform 0.25s';
+      el.style.opacity = '0';
+      el.style.transform = 'translateX(30px)';
+      setTimeout(() => el.remove(), 260);
+    }, 2400);
+  }
+
+  async function copy(text) {
+    try { await navigator.clipboard.writeText(text); return true; }
+    catch {
       try {
         const ta = document.createElement('textarea');
         ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
+        ta.style.cssText = 'position:fixed;left:-9999px;top:0';
         document.body.appendChild(ta);
         ta.select();
         document.execCommand('copy');
         ta.remove();
         return true;
-      } catch {
-        return false;
-      }
+      } catch { return false; }
     }
   }
 
-  function fmtDate(ts) {
-    const d = new Date(ts);
-    const pad = (n) => String(n).padStart(2, '0');
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate())
-         + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
-  }
+  /* ── storage ─────────────────────────────────── */
+  const readCache = () => { try { return JSON.parse(localStorage.getItem(CK)||'{}'); } catch { return {}; } };
+  const writeCache = c => { try { localStorage.setItem(CK, JSON.stringify(c)); } catch {} };
+  const readHist = () => { try { return JSON.parse(localStorage.getItem(HK)||'[]'); } catch { return []; } };
+  const writeHist = h => { try { localStorage.setItem(HK, JSON.stringify(h.slice(0,HMAX))); } catch {} };
+  const cKey = (t,q) => t+':'+q.toLowerCase();
 
-  function timeAgo(ts) {
-    const diff = Math.floor((Date.now() - ts) / 1000);
-    if (diff < 60) return diff + 's ago';
-    if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
-    if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
-    return Math.floor(diff / 86400) + 'd ago';
+  /* ── clock ───────────────────────────────────── */
+  function tick() {
+    const d = new Date(), p = n => String(n).padStart(2,'0');
+    clockEl.textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
   }
+  setInterval(tick, 1000); tick();
 
-  function escHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
-  // ── localStorage ──────────────────────────────────────────
-  function readCache() {
-    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}'); }
-    catch { return {}; }
-  }
-  function writeCache(c) {
-    try { localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch {}
-  }
-  function readHistory() {
-    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); }
-    catch { return []; }
-  }
-  function writeHistory(h) {
-    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(0, HISTORY_MAX))); } catch {}
-  }
-
-  function cacheKey(type, query) { return type + ':' + query.toLowerCase(); }
-
-  // ── render: type tabs ─────────────────────────────────────
+  /* ── tabs ────────────────────────────────────── */
   function renderTabs() {
-    typeTabsEl.innerHTML = Object.entries(TYPES).map(([k, v]) =>
-      '<button class="type-tab' + (k === currentType ? ' active' : '') + '" data-type="' + k + '">'
-      + '<span class="tt-label">' + v.label + '</span>'
-      + '<span class="tt-desc">' + v.desc + '</span>'
-      + '</button>'
+    tabsEl.innerHTML = Object.entries(TYPES).map(([k,v]) =>
+      `<button class="tab${k===currentType?' active':''}" data-type="${k}">
+        <span class="tt-label">${v.label}</span>
+        <span class="tt-desc">${v.desc}</span>
+      </button>`
     ).join('');
-    typeTabsEl.querySelectorAll('.type-tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        currentType = btn.dataset.type;
+    tabsEl.querySelectorAll('.tab').forEach(b => {
+      b.addEventListener('click', () => {
+        currentType = b.dataset.type;
         renderTabs();
-        queryInput.placeholder = TYPES[currentType].ph;
-        queryInput.focus();
+        inputEl.placeholder = TYPES[currentType].ph;
+        inputEl.focus();
       });
     });
   }
 
-  // ── render: meta chips ────────────────────────────────────
-  function resetMeta() {
-    metaType.textContent = '—';
-    metaQuery.textContent = '—';
-    metaCredits.style.display = 'none';
-    metaTime.style.display = 'none';
-    metaChecked.style.display = 'none';
+  /* ── meta chips ──────────────────────────────── */
+  function resetChips() {
+    chipType.textContent = '—';
+    chipQuery.textContent = '—';
+    chipCredits.style.display = 'none';
+    chipTime.style.display = 'none';
+    chipCache.style.display = 'none';
+    chipCache.classList.remove('cache');
   }
 
-  function updateMeta(data, query, cachedTs) {
-    metaType.textContent = data.type || TYPES[currentType].endpoint.slice(1);
-    metaQuery.textContent = 'q=' + query;
-
+  function updateChips(data, query, cacheTs) {
+    chipType.textContent = data.type || TYPES[currentType].ep.slice(1);
+    chipQuery.textContent = 'q=' + query;
     if (data.credits_left != null) {
-      metaCredits.style.display = '';
-      metaCredits.textContent = 'credits ' + data.credits_left;
-      metaCredits.className = 'meta-chip' + (data.credits_left < 50 ? ' warn' : ' ok');
+      chipCredits.style.display = '';
+      chipCredits.textContent = 'credits ' + data.credits_left;
+      chipCredits.className = 'chip' + (data.credits_left < 50 ? ' warn' : ' ok');
     }
-    const rt = (data.broker && (data.broker.response_time || data.broker.response_time_seconds)) || null;
+    const rt = data.broker && (data.broker.response_time || data.broker.response_time_seconds);
     if (rt != null) {
-      metaTime.style.display = '';
-      metaTime.textContent = 't=' + rt;
+      chipTime.style.display = '';
+      chipTime.textContent = 't=' + rt;
     }
-    if (cachedTs) {
-      metaChecked.style.display = '';
-      metaChecked.textContent = 'CACHED · ' + fmtDate(cachedTs) + ' · ' + timeAgo(cachedTs);
+    if (cacheTs) {
+      chipCache.style.display = '';
+      chipCache.textContent = '⚡ cached · ' + ago(cacheTs);
+      chipCache.classList.add('cache');
     } else {
-      metaChecked.style.display = 'none';
+      chipCache.style.display = 'none';
+      chipCache.classList.remove('cache');
     }
   }
 
-  // ── render: generic value ─────────────────────────────────
+  /* ── render value ────────────────────────────── */
   function renderValue(v) {
     if (v == null) return '<span class="j-null">null</span>';
-    if (typeof v === 'string') return escHtml(v);
-    if (typeof v === 'number' || typeof v === 'boolean') return escHtml(String(v));
-    if (Array.isArray(v)) return '<span class="arr">[' + v.length + ' items]</span>';
-    if (typeof v === 'object') return '<span class="arr">{' + Object.keys(v).length + ' keys}</span>';
-    return escHtml(String(v));
+    if (typeof v === 'string') return esc(v);
+    if (typeof v === 'number') return esc(String(v));
+    if (typeof v === 'boolean') return esc(String(v));
+    if (Array.isArray(v)) {
+      if (!v.length) return '<span class="j-null">[]</span>';
+      return '<ul class="arr-list">' + v.map((x,i) =>
+        `<li><span class="arr-idx">[${i}]</span>${renderValue(x)}</li>`
+      ).join('') + '</ul>';
+    }
+    if (typeof v === 'object') {
+      const keys = Object.keys(v);
+      if (!keys.length) return '<span class="j-null">{}</span>';
+      return '<ul class="arr-list">' + keys.map(k =>
+        `<li><span class="arr-idx">${esc(k)}:</span>${renderValue(v[k])}</li>`
+      ).join('') + '</ul>';
+    }
+    return esc(String(v));
   }
 
-  function rawValue(v) {
+  function rawVal(v) {
     if (v == null) return '';
     if (typeof v === 'string') return v;
     if (typeof v === 'number' || typeof v === 'boolean') return String(v);
     try { return JSON.stringify(v); } catch { return String(v); }
   }
 
-  // ── render: record card ───────────────────────────────────
+  function isComplex(v) {
+    return v && typeof v === 'object';
+  }
+
+  /* ── render record ───────────────────────────── */
   function renderRecord(rec, idx, total) {
     if (!rec || typeof rec !== 'object') {
-      return '<div class="record"><div class="fields">'
-        + '<div class="field"><div class="field-key">value</div>'
-        + '<div class="field-val" data-copy="' + escHtml(rawValue(rec)) + '">' + renderValue(rec) + '</div></div></div></div>';
+      return `<div class="record"><div class="fields">
+        <div class="field"><div class="field-key">value</div>
+        <div class="field-val" data-copy="${esc(rawVal(rec))}">${renderValue(rec)}</div></div>
+      </div></div>`;
     }
 
-    const priority = PRIORITY_FIELDS[currentType] || [];
-    const keys = Object.keys(rec);
-    // sort: priority keys first in declared order, then the rest alphabetical
-    keys.sort((a, b) => {
-      const ia = priority.indexOf(a), ib = priority.indexOf(b);
+    const prio = PRIORITY[currentType] || [];
+    const keys = Object.keys(rec).sort((a,b) => {
+      const ia = prio.indexOf(a), ib = prio.indexOf(b);
       if (ia !== -1 && ib !== -1) return ia - ib;
       if (ia !== -1) return -1;
       if (ib !== -1) return 1;
@@ -922,335 +1249,353 @@
     });
 
     const rows = keys.map(k => {
-      const isPriority = priority.includes(k);
-      const raw = rawValue(rec[k]);
-      const isComplex = rec[k] && typeof rec[k] === 'object';
-      return '<div class="field' + (isPriority ? ' priority' : '') + '">'
-        + '<div class="field-key">' + escHtml(k) + '</div>'
-        + '<div class="field-val' + (isComplex ? ' arr' : '') + '"'
-        + (isComplex ? '' : ' data-copy="' + escHtml(raw) + '"')
-        + '>' + renderValue(rec[k]) + '</div>'
-        + '</div>';
+      const isP = prio.includes(k);
+      const complex = isComplex(rec[k]);
+      const cls = 'field' + (isP ? ' priority' : '');
+      const vcls = 'field-val' + (complex ? ' complex' : '');
+      const copyAttr = complex ? '' : ` data-copy="${esc(rawVal(rec[k]))}"`;
+      return `<div class="${cls}">
+        <div class="field-key">${esc(k)}</div>
+        <div class="${vcls}"${copyAttr}>${renderValue(rec[k])}</div>
+      </div>`;
     }).join('');
 
-    const sourceBadge = rec.source
-      ? '<span class="record-source">' + escHtml(rec.source) + '</span>'
-      : '';
-    const label = total > 1 ? 'RECORD ' + (idx + 1) + '/' + total : 'RECORD';
-    const recJson = escHtml(JSON.stringify(rec, null, 2));
+    const label = total > 1 ? `RECORD ${idx+1}/${total}` : 'RECORD';
+    const src = rec.source ? `<span class="source-badge">${esc(rec.source)}</span>` : '';
+    const copyJson = esc(JSON.stringify(rec, null, 2));
 
-    return '<div class="record">'
-      + '<div class="record-head">'
-      + '<span class="record-badge">' + label + '</span>'
-      + sourceBadge
-      + '<button class="record-copy" data-copy-btn="' + recJson + '">COPY JSON</button>'
-      + '</div>'
-      + '<div class="fields">' + rows + '</div>'
-      + '</div>';
+    return `<div class="record" style="animation-delay:${idx*0.06}s">
+      <div class="record-head">
+        <span class="badge">${label}</span>
+        ${src}
+        <button class="copy-btn" data-copy-btn="${copyJson}">COPY JSON</button>
+      </div>
+      <div class="fields">${rows}</div>
+    </div>`;
   }
 
-  // ── render: consensus ─────────────────────────────────────
+  /* ── render consensus ────────────────────────── */
   function renderConsensus(c) {
     if (!c || !c.mobile_number) return '';
-    const label = c.unanimous ? 'CONSENSUS · UNANIMOUS' : 'CONSENSUS';
-    return '<div class="consensus">'
-      + '<span class="c-label">' + label + '</span>'
-      + '<span class="c-value" data-copy="' + escHtml(c.mobile_number) + '">' + escHtml(c.mobile_number) + '</span>'
-      + '<span class="c-votes">' + c.votes + '/' + c.sources_total + ' sources agree</span>'
-      + '</div>';
+    const unan = c.unanimous
+      ? '<span class="c-unanimous">◆ UNANIMOUS</span>'
+      : `${c.votes}/${c.sources_total} agree`;
+    return `<div class="consensus">
+      <span class="c-label">Consensus</span>
+      <span class="c-value" data-copy="${esc(c.mobile_number)}">${esc(c.mobile_number)}</span>
+      <span class="c-votes">${unan}</span>
+    </div>`;
   }
 
-  // ── render: broker strip ──────────────────────────────────
-  function renderBroker(broker) {
+  /* ── render stats ────────────────────────────── */
+  function renderStats(broker) {
     if (!broker || !Object.keys(broker).length) return '';
-    const items = Object.entries(broker).map(([k, v]) =>
-      '<span class="bk-item">' + escHtml(k) + ': <b>' + escHtml(rawValue(v)) + '</b></span>'
-    ).join('');
-    return '<div class="broker-strip">' + items + '</div>';
+    const items = [];
+    if (broker.req_left != null && broker.req_total != null) {
+      const pct = Math.min(100, (broker.req_left / broker.req_total) * 100);
+      items.push(`<div class="stat accent">
+        <span class="stat-label">Requests</span>
+        <span class="stat-value">${broker.req_left}<span style="color:var(--text-3);font-size:13px;font-weight:400">/${broker.req_total}</span></span>
+        <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
+      </div>`);
+    }
+    if (broker.expiry) items.push(`<div class="stat cyan"><span class="stat-label">Expiry</span><span class="stat-value">${esc(broker.expiry)}</span></div>`);
+    if (broker.status) items.push(`<div class="stat"><span class="stat-label">Status</span><span class="stat-value">${esc(broker.status)}</span></div>`);
+    if (broker.cached != null) items.push(`<div class="stat ${broker.cached?'warn':''}"><span class="stat-label">Cached</span><span class="stat-value">${broker.cached?'YES':'NO'}</span></div>`);
+    if (broker.success != null) items.push(`<div class="stat ${broker.success?'accent':'warn'}"><span class="stat-label">Success</span><span class="stat-value">${broker.success?'TRUE':'FALSE'}</span></div>`);
+    if (broker.response_time) items.push(`<div class="stat cyan"><span class="stat-label">Response</span><span class="stat-value">${esc(broker.response_time)}</span></div>`);
+    if (broker.response_time_seconds != null) items.push(`<div class="stat"><span class="stat-label">Seconds</span><span class="stat-value">${broker.response_time_seconds}s</span></div>`);
+    if (!items.length) {
+      Object.entries(broker).forEach(([k,v]) => {
+        if (isComplex(v)) return;
+        items.push(`<div class="stat"><span class="stat-label">${esc(k)}</span><span class="stat-value">${esc(rawVal(v))}</span></div>`);
+      });
+    }
+    return items.length ? `<div class="stats-strip">${items.join('')}</div>` : '';
   }
 
-  // ── render: raw JSON ──────────────────────────────────────
+  /* ── render raw json ────────────────────────── */
   function highlightJson(obj) {
-    let json = JSON.stringify(obj, null, 2);
-    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    return json.replace(
+    let j = JSON.stringify(obj, null, 2)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return j.replace(
       /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
-      function (m) {
-        let cls = 'j-num';
-        if (/^"/.test(m)) {
-          cls = /:$/.test(m) ? 'j-key' : 'j-str';
-        } else if (/true|false/.test(m)) cls = 'j-bool';
-        else if (/null/.test(m)) cls = 'j-null';
-        return '<span class="' + cls + '">' + m + '</span>';
+      m => {
+        let c = 'j-num';
+        if (/^"/.test(m)) c = /:$/.test(m) ? 'j-key' : 'j-str';
+        else if (/true|false/.test(m)) c = 'j-bool';
+        else if (/null/.test(m)) c = 'j-null';
+        return `<span class="${c}">${m}</span>`;
       }
     );
   }
 
   function renderRaw(data) {
-    const html = escHtml(JSON.stringify(data, null, 2));
-    const fullJson = escHtml(JSON.stringify(data, null, 2));
-    return '<div class="raw-section" id="rawSection">'
-      + '<div class="raw-head" id="rawHead">'
-      + '<span class="raw-title">RAW RESPONSE</span>'
-      + '<button class="record-copy" style="margin-left:auto;margin-right:10px" data-copy-btn="' + fullJson + '">COPY ALL</button>'
-      + '<span class="raw-toggle">[ expand ]</span>'
-      + '</div>'
-      + '<div class="raw-body"><pre>' + highlightJson(data) + '</pre></div>'
-      + '</div>';
+    const json = esc(JSON.stringify(data, null, 2));
+    return `<div class="raw" id="rawSec">
+      <div class="raw-head" id="rawHead">
+        <span class="raw-title">RAW RESPONSE</span>
+        <button class="copy-btn" data-copy-btn="${json}" style="margin-left:auto;margin-right:10px">COPY</button>
+        <span class="raw-toggle" id="rawToggle">[ expand ]</span>
+      </div>
+      <div class="raw-body"><pre>${highlightJson(data)}</pre></div>
+    </div>`;
   }
 
-  // ── render: error ─────────────────────────────────────────
-  function renderError(err, status, extra) {
-    let html = '<div class="error-box">'
-      + '<div class="err-title">✕ REQUEST FAILED</div>'
-      + escHtml(err || 'unknown error');
-    if (status) html += '<br><br><span style="color:var(--fg-dim)">HTTP status: ' + escHtml(String(status)) + '</span>';
-    if (extra) html += '<br><span style="color:var(--fg-dim)">' + escHtml(extra) + '</span>';
-    html += '</div>';
-    return html;
+  /* ── render error ────────────────────────────── */
+  function renderError(msg, status, extra) {
+    let h = `<div class="error-box"><div class="err-title">✕ REQUEST FAILED</div>${esc(msg)}`;
+    if (status) h += `<br><br><span style="color:var(--text-3)">HTTP ${esc(String(status))}</span>`;
+    if (extra) h += `<br><span style="color:var(--text-3)">${esc(extra)}</span>`;
+    return h + '</div>';
   }
 
-  // ── render: full result ───────────────────────────────────
-  function renderResult(data, query, cachedTs) {
-    let html = '';
+  /* ── render full result ──────────────────────── */
+  function renderResult(data, query, cacheTs) {
+    let h = '';
+    if (data.consensus) h += renderConsensus(data.consensus);
 
-    if (data.consensus) html += renderConsensus(data.consensus);
-
-    // records: prefer array; fall back to single record
     let records = [];
     if (Array.isArray(data.records) && data.records.length) records = data.records;
     else if (data.record) records = [data.record];
 
     if (records.length) {
-      html += records.map((r, i) => renderRecord(r, i, records.length)).join('');
+      h += '<div class="records">' + records.map((r,i) => renderRecord(r,i,records.length)).join('') + '</div>';
     } else if (data.ok && !data.error) {
-      html += '<div class="empty-state"><div class="big">∅</div>no records returned for this query</div>';
+      h += '<div class="empty"><span class="glyph">∅</span>no records returned for this query</div>';
     }
 
-    if (data.broker) html += renderBroker(data.broker);
+    if (data.broker) h += renderStats(data.broker);
 
     if (data.error) {
-      html += '<div style="margin-top:12px">'
-        + renderError(data.error, data.ok === false ? 402 : null, null)
-        + '</div>';
+      h += '<div style="margin-top:14px">' + renderError(data.error, data.ok===false?402:null) + '</div>';
     }
 
-    html += renderRaw(data);
-    return html;
+    h += renderRaw(data);
+    return h;
   }
 
-  // ── copy delegation ───────────────────────────────────────
-  document.addEventListener('click', async (e) => {
+  /* ── copy interactions ───────────────────────── */
+  document.addEventListener('click', async e => {
     const t = e.target;
     if (!(t instanceof HTMLElement)) return;
 
-    // value cell copy
-    const copyEl = t.closest('[data-copy]');
-    if (copyEl && !t.closest('[data-copy-btn]')) {
-      const val = copyEl.getAttribute('data-copy');
-      if (val) {
-        const ok = await copyText(val);
-        if (ok) toast('copied: ' + (val.length > 40 ? val.slice(0, 40) + '…' : val));
-        else toast('copy failed', true);
-      }
+    const copyBtn = t.closest('[data-copy-btn]');
+    if (copyBtn) {
+      const val = copyBtn.getAttribute('data-copy-btn');
+      const ok = await copy(val);
+      if (ok) {
+        copyBtn.classList.add('copied');
+        copyBtn.textContent = '✓ COPIED';
+        setTimeout(() => {
+          copyBtn.classList.remove('copied');
+          copyBtn.textContent = copyBtn.textContent.includes('ALL') || copyBtn.classList.contains('copy-btn') && copyBtn.textContent.includes('JSON') ? 'COPY JSON' : 'COPY';
+        }, 1200);
+        toast('copied to clipboard');
+      } else toast('copy failed', true);
       return;
     }
 
-    // explicit copy button
-    const btn = t.closest('[data-copy-btn]');
-    if (btn) {
-      const val = btn.getAttribute('data-copy-btn');
-      const ok = await copyText(val);
-      if (ok) toast('copied to clipboard');
-      else toast('copy failed', true);
-      return;
+    const cell = t.closest('[data-copy]');
+    if (cell && !cell.classList.contains('complex')) {
+      const val = cell.getAttribute('data-copy');
+      if (!val) return;
+      const ok = await copy(val);
+      if (ok) {
+        cell.classList.add('copied');
+        setTimeout(() => cell.classList.remove('copied'), 400);
+        toast('copied: ' + (val.length > 36 ? val.slice(0,36)+'…' : val));
+      } else toast('copy failed', true);
     }
   });
 
-  // raw section toggle (event delegation)
-  document.addEventListener('click', (e) => {
+  /* raw toggle */
+  document.addEventListener('click', e => {
     const head = e.target.closest('#rawHead');
     if (!head) return;
-    const section = head.parentElement;
-    section.classList.toggle('open');
-    const tog = head.querySelector('.raw-toggle');
-    if (tog) tog.textContent = section.classList.contains('open') ? '[ collapse ]' : '[ expand ]';
+    if (e.target.closest('.copy-btn')) return;
+    const sec = head.closest('.raw');
+    sec.classList.toggle('open');
+    const tog = head.querySelector('#rawToggle');
+    if (tog) tog.textContent = sec.classList.contains('open') ? '[ collapse ]' : '[ expand ]';
   });
 
-  // ── lookup ────────────────────────────────────────────────
-  async function doLookup(forceRefresh) {
+  /* ── lookup ──────────────────────────────────── */
+  async function doLookup(forceFresh) {
     if (loading) return;
-    const rawQuery = queryInput.value.trim();
+    const raw = inputEl.value.trim();
     const cfg = TYPES[currentType];
 
-    if (!rawQuery) {
-      toast('enter a query first', true);
-      queryInput.focus();
-      return;
-    }
+    if (!raw) { toast('enter a query first', true); inputEl.focus(); return; }
 
-    let query = cfg.upper ? rawQuery.toUpperCase() : rawQuery;
+    const query = cfg.upper ? raw.toUpperCase() : raw;
     if (!cfg.pattern.test(query)) {
       toast('invalid format for ' + cfg.label, true);
-      panelBody.innerHTML = renderError(
-        'query does not match expected format for ' + cfg.label,
-        400,
-        'expected pattern: ' + cfg.pattern.toString()
-      );
+      panelBody.innerHTML = renderError(`query does not match ${cfg.label} format`, 400, 'expected: ' + cfg.pattern.toString());
       return;
     }
 
-    const ck = cacheKey(currentType, query);
+    const ck = cKey(currentType, query);
     const cache = readCache();
 
-    // cache hit
-    if (!forceRefresh && cache[ck]) {
+    if (!forceFresh && cache[ck]) {
       const entry = cache[ck];
-      updateMeta(entry.data, query, entry.ts);
+      updateChips(entry.data, query, entry.ts);
       panelBody.innerHTML = renderResult(entry.data, query, entry.ts);
-      toast('loaded from cache · ' + timeAgo(entry.ts));
+      toast('⚡ loaded from cache · ' + ago(entry.ts));
       return;
     }
 
-    // loading state
     loading = true;
-    lookupBtn.disabled = true;
-    resetMeta();
-    updateMeta({ type: cfg.endpoint.slice(1), credits_left: null }, query, null);
-    metaType.textContent = cfg.label;
-    panelBody.innerHTML = '<div class="loading-state">SCANNING ' + escHtml(cfg.label) + ' · ' + escHtml(query) + '<div class="loading-bar"></div></div>';
+    btnEl.disabled = true;
+    resetChips();
+    chipType.textContent = cfg.label;
+    chipQuery.textContent = 'q=' + query;
+    panelBody.innerHTML = `<div class="loading"><div class="loading-text">SCANNING ${esc(cfg.label)} · ${esc(query)}</div><div class="loading-bar"></div></div>`;
 
-    const url = API_BASE + cfg.endpoint + '?q=' + encodeURIComponent(query);
+    const url = API + cfg.ep + '?q=' + encodeURIComponent(query);
 
     try {
-      const res = await fetch(url, { method: 'GET', headers: { 'Accept': 'application/json' } });
+      const res = await fetch(url, { method: 'GET', headers: { Accept: 'application/json' } });
       let data;
       try { data = await res.json(); }
-      catch { throw new Error('upstream returned unparseable JSON (status ' + res.status + ')'); }
+      catch { throw new Error('upstream returned unparseable JSON (HTTP ' + res.status + ')'); }
 
       if (!res.ok && !data.ok) {
-        const msg = data.error || ('HTTP ' + res.status);
-        metaType.textContent = cfg.label;
-        updateMeta(data, query, null);
+        updateChips(data, query, null);
         panelBody.innerHTML = renderResult(data, query, null);
-        toast('lookup failed: ' + msg, true);
-        pushHistory(currentType, query, false, null);
+        toast('lookup failed: ' + (data.error || 'HTTP ' + res.status), true);
+        pushHist(currentType, query, false, null);
         return;
       }
 
-      // success — store + render
       const ts = Date.now();
       cache[ck] = { data, ts };
       writeCache(cache);
 
-      updateMeta(data, query, null);
+      updateChips(data, query, null);
       panelBody.innerHTML = renderResult(data, query, null);
-      toast('lookup complete · ' + (data.record_count != null ? data.record_count + ' record(s)' : 'ok'));
-
       const summary = summarize(data);
-      pushHistory(currentType, query, true, summary);
+      toast('lookup complete · ' + (data.record_count != null ? data.record_count + ' record(s)' : 'ok'));
+      pushHist(currentType, query, true, summary);
 
     } catch (err) {
-      const msg = err && err.message ? err.message : String(err);
-      metaType.textContent = cfg.label;
-      updateMeta({ type: cfg.endpoint.slice(1) }, query, null);
-      panelBody.innerHTML = renderError(msg, null, 'check your network or the API may be down');
+      const msg = (err && err.message) || String(err);
+      updateChips({ type: cfg.ep.slice(1) }, query, null);
+      panelBody.innerHTML = renderError(msg, null, 'network or API unreachable');
       toast('connection failed', true);
-      pushHistory(currentType, query, false, null);
+      pushHist(currentType, query, false, null);
     } finally {
       loading = false;
-      lookupBtn.disabled = false;
-      queryInput.focus();
-      queryInput.select();
+      btnEl.disabled = false;
+      inputEl.focus();
+      inputEl.select();
     }
   }
 
-  function summarize(data) {
-    if (data.consensus && data.consensus.mobile_number) return data.consensus.mobile_number;
-    if (data.record) {
-      if (data.record.mobile_number) return data.record.mobile_number;
-      if (data.record.number) return data.record.number;
-      if (data.record.name) return data.record.name;
-      if (data.record.tg_id) return data.record.tg_id;
+  function summarize(d) {
+    if (d.consensus && d.consensus.mobile_number) return d.consensus.mobile_number;
+    if (d.record) {
+      if (d.record.mobile_number) return d.record.mobile_number;
+      if (d.record.number) return d.record.number;
+      if (d.record.name) return d.record.name;
+      if (d.record.tg_id) return d.record.tg_id;
     }
     return null;
   }
 
-  // ── history ───────────────────────────────────────────────
-  function pushHistory(type, query, ok, summary) {
-    const h = readHistory();
-    // remove duplicate of same type+query from front
-    const filtered = h.filter(x => !(x.type === type && x.query === query));
-    filtered.unshift({ type, query, ok, ts: Date.now(), summary });
-    writeHistory(filtered);
-    renderHistory();
+  /* ── history ─────────────────────────────────── */
+  function pushHist(type, query, ok, summary) {
+    const h = readHist().filter(x => !(x.type===type && x.query===query));
+    h.unshift({ type, query, ok, ts: Date.now(), summary });
+    writeHist(h);
+    renderHist();
   }
 
-  function renderHistory() {
-    const h = readHistory();
+  function renderHist() {
+    const h = readHist();
+    histCount.textContent = h.length ? `[${h.length}/${HMAX}]` : '';
     if (!h.length) {
-      historyList.innerHTML = '<div class="history-empty">no history yet</div>';
+      histList.innerHTML = '<div class="hist-empty">no history yet — run your first lookup above</div>';
       return;
     }
-    historyList.innerHTML = h.map((item, i) =>
-      '<div class="history-item" data-hist-idx="' + i + '">'
-      + '<span class="hi-type">' + escHtml(TYPES[item.type] ? TYPES[item.type].label : item.type) + '</span>'
-      + '<span class="hi-query">' + escHtml(item.query) + (item.summary ? ' → ' + escHtml(item.summary) : '') + '</span>'
-      + '<span class="hi-status ' + (item.ok ? 'ok' : 'err') + '">' + (item.ok ? 'OK' : 'ERR') + '</span>'
-      + '<span class="hi-time">' + fmtDate(item.ts) + '</span>'
-      + '</div>'
-    ).join('');
+    histList.innerHTML = h.map((it, i) => {
+      const label = TYPES[it.type] ? TYPES[it.type].label : it.type.toUpperCase();
+      const sum = it.summary ? `<span class="arrow">→</span><span class="summary">${esc(it.summary)}</span>` : '';
+      return `<div class="hist-item" data-idx="${i}" style="animation-delay:${i*0.02}s">
+        <span class="hist-type">${esc(label)}</span>
+        <span class="hist-query">${esc(it.query)}${sum}</span>
+        <span class="hist-status ${it.ok?'ok':'err'}">${it.ok?'OK':'ERR'}</span>
+        <span class="hist-time">${fmt(it.ts)}</span>
+        <button class="hist-del" data-del="${i}" title="remove">✕</button>
+      </div>`;
+    }).join('');
 
-    historyList.querySelectorAll('.history-item').forEach(el => {
+    histList.querySelectorAll('.hist-del').forEach(b => {
+      b.addEventListener('click', e => {
+        e.stopPropagation();
+        const arr = readHist();
+        arr.splice(parseInt(b.dataset.del, 10), 1);
+        writeHist(arr);
+        renderHist();
+        toast('removed from history');
+      });
+    });
+
+    histList.querySelectorAll('.hist-item').forEach(el => {
       el.addEventListener('click', () => {
-        const idx = parseInt(el.dataset.histIdx, 10);
-        const item = readHistory()[idx];
-        if (!item) return;
-        currentType = item.type;
+        const it = readHist()[parseInt(el.dataset.idx, 10)];
+        if (!it) return;
+        currentType = it.type;
         renderTabs();
-        queryInput.placeholder = TYPES[currentType].ph;
-        queryInput.value = item.query;
+        inputEl.placeholder = TYPES[currentType].ph;
+        inputEl.value = it.query;
         doLookup(false);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       });
     });
   }
 
-  // ── header buttons ────────────────────────────────────────
-  $('btnClearCache').addEventListener('click', () => {
-    if (!confirm('Purge local cache + history? This only clears your browser, not the server.')) return;
-    localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(HISTORY_KEY);
+  /* ── header actions ──────────────────────────── */
+  $('btnPurge').addEventListener('click', () => {
+    if (!confirm('Purge local cache + history? (server is untouched)')) return;
+    localStorage.removeItem(CK);
+    localStorage.removeItem(HK);
+    renderHist();
+    resetChips();
+    panelBody.innerHTML = '<div class="empty"><span class="glyph">[ ]</span>cache purged — ready for new queries</div>';
     toast('local cache purged');
-    renderHistory();
-    resetMeta();
-    panelBody.innerHTML = '<div class="empty-state"><div class="big">[ ]</div>cache cleared. ready for new queries.</div>';
   });
 
-  $('btnExportHistory').addEventListener('click', () => {
-    const h = readHistory();
+  $('btnExport').addEventListener('click', () => {
+    const h = readHist();
     if (!h.length) { toast('no history to export', true); return; }
     const blob = new Blob([JSON.stringify(h, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'dz-osint-history-' + Date.now() + '.json';
+    a.download = `dz-osint-history-${Date.now()}.json`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     toast('history exported');
   });
 
-  // ── wire input + button ───────────────────────────────────
-  lookupBtn.addEventListener('click', () => doLookup(true));
-  queryInput.addEventListener('keydown', (e) => {
+  /* ── wire input ──────────────────────────────── */
+  btnEl.addEventListener('click', () => doLookup(true));
+  inputEl.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); doLookup(true); }
-    if (e.key === 'Escape') { queryInput.value = ''; }
+    if (e.key === 'Escape') { inputEl.value = ''; inputEl.blur(); }
+  });
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault(); inputEl.focus(); inputEl.select();
+    }
   });
 
-  // ── init ──────────────────────────────────────────────────
+  /* ── init ────────────────────────────────────── */
   renderTabs();
-  renderHistory();
-  queryInput.placeholder = TYPES[currentType].ph;
-  queryInput.focus();
-
+  renderHist();
+  inputEl.placeholder = TYPES[currentType].ph;
+  inputEl.focus();
 })();
 </script>
 </body>
