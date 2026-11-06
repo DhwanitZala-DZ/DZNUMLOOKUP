@@ -3,6 +3,7 @@
   "rewrites": [
     { "source": "/num", "destination": "/api/num" },
     { "source": "/tg", "destination": "/api/tg" },
+    { "source": "/aadhar", "destination": "/api/aadhar" },
     { "source": "/veh", "destination": "/api/veh" }
   ],
   "headers": [
