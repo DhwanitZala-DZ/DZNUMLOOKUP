@@ -1,10 +1,21 @@
 {
   "version": 2,
+  "cleanUrls": true,
+  "trailingSlash": false,
   "rewrites": [
+    { "source": "/", "destination": "/index.html" },
+
     { "source": "/num", "destination": "/api/num" },
+    { "source": "/num/(.*)", "destination": "/api/num" },
+
     { "source": "/tg", "destination": "/api/tg" },
+    { "source": "/tg/(.*)", "destination": "/api/tg" },
+
     { "source": "/aadhar", "destination": "/api/aadhar" },
-    { "source": "/veh", "destination": "/api/veh" }
+    { "source": "/aadhar/(.*)", "destination": "/api/aadhar" },
+
+    { "source": "/veh", "destination": "/api/veh" },
+    { "source": "/veh/(.*)", "destination": "/api/veh" }
   ],
   "headers": [
     {
